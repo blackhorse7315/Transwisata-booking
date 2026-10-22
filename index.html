@@ -134,6 +134,10 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
 <div id="adminWorkspace" class="hidden"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px"><h2>Advanced Cost Management</h2><button class="btn secondary" onclick="adminSignOut()">Sign Out</button></div><p class="small">Manage aircraft rates, default charges, and airport ground handling in IDR or USD. All values are normalized to USD for calculation and synchronized with Firebase Firestore when authorized. Local cache is retained.<div style="max-width:320px;margin-top:15px"><label>Admin Pricing Currency</label><select id="adminCurrency" onchange="changeAdminCurrency(this.value)"><option value="USD">USD — US Dollar</option><option value="IDR">IDR — Indonesian Rupiah</option></select><small class="small">Currency selection updates monetary labels and values. Fuel burn is entered in liters per flight hour and fuel price per liter in both USD and IDR modes. Unsaved edits will be preserved when switching.</small></div></p>
 <h3>Fleet Performance & Specifications</h3><p class="small">Edit cruise speed, endurance, passenger seats and maximum range for each aircraft. These values appear in the Fleet comparison cards. Display information only; operational limits must be verified against approved aircraft documents.</p><div id="fleetSpecsAdmin" class="fleet-spec-admin"></div><div class="actions"><button class="btn" type="button" onclick="saveFleetSpecs()">Save Fleet Specifications</button><button class="btn secondary" type="button" onclick="resetFleetSpecs()">Reset Specifications</button></div><p id="fleetSpecsSaved" class="small" aria-live="polite"></p><h3>Fleet Background Photos</h3><p class="small">Upload a separate background photo for each aircraft. Images are resized and uploaded to Firebase Storage after authorized Admin login. To show photos to all website visitors, the images must also be deployed as website assets or stored in shared cloud storage; local uploads alone are not synchronized across devices.</p><div id="fleetPhotoAdmin" class="fleet-photo-admin"></div><p id="fleetPhotoStatus" class="small" aria-live="polite"></p><h3>Aircraft Pricing</h3><div id="adminAircraftRates" class="costgrid"></div>
 <h3>Default Cost Assumptions</h3><div id="adminCostFields" class="costgrid"></div>
+<h3>Helicopter Route Management</h3>
+<p class="small">Save preferred airport sequences for Bell 412EP and AW109S Grand only. Saved routes override automatic refuel routing. Each sector must be under 2h 15m using the aircraft planning speed. Round trips return through the same airports in reverse order. Fuel supply and operational approval must be confirmed separately.</p>
+<div class="costgrid"><div><label for="heliRouteAircraft">Helicopter</label><select id="heliRouteAircraft"><option value="both">Bell 412EP &amp; AW109S Grand</option>Bell 412EP</option><option>AW109S Grand</option></select></div><div><label for="heliRouteSequence">Airport sequence (IATA / ICAO)</label><input id="heliRouteSequence" placeholder="HLP-SRG-SUB" autocomplete="off"></div><div><label for="heliRouteReverse">Also save reverse search route</label><input id="heliRouteReverse" type="checkbox" style="width:auto"> SUB-SRG-HLP</div></div>
+<div class="actions"><button class="btn" type="button" onclick="saveHelicopterRoute()">Save Helicopter Route</button></div><p id="heliRouteStatus" class="small" role="status" aria-live="polite"></p><div id="heliRoutesAdmin" style="overflow:auto"></div>
 <h3>Ground Handling by Airport</h3><p class="small">Add an airport using its IATA (3-letter) or ICAO (4-letter) code. Airport-specific rates override the default handling rate for each airport movement.</p>
 <div class="costgrid"><div><label>Airport IATA / ICAO Code</label><input id="handlingAirport" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. HLP or WIHH"></div><div><label>Ground Handling (<span id="handlingCurrencyLabel">USD</span> / movement)</label><input id="handlingAmount" type="number" min="0" step="0.01" placeholder="350"></div></div><div class="actions"><button class="btn secondary" onclick="addHandlingRate()">Add / Update Airport Rate</button></div><div style="overflow:auto"><table><thead><tr><th>Airport</th><th>Code</th><th id="handlingTableCurrency">Handling USD / movement</th><th>Action</th></tr></thead><tbody id="handlingTable"></tbody></table></div>
 <div class="actions"><button class="btn" onclick="saveAdminCosts()">Save Cost Settings</button><button class="btn secondary" onclick="resetAdminCosts()">Reset to Demo Defaults</button></div><p id="adminSaved" class="small" aria-live="polite"></p>
@@ -318,10 +322,58 @@ const airportSearchStyle=document.createElement('style');airportSearchStyle.text
 function printEstimate(){if(!lastEstimate){alert('Enter route distance or flight time first.');return}window.print()}
 costIds.forEach(id=>document.getElementById(id).addEventListener('input',id==='plane'?updatePlaneCosts:calculateEstimate));
 
+function isHelicopter(name){return name==='Bell 412EP'||name==='AW109S Grand'}
+function getHelicopterRoutes(){try{return JSON.parse(localStorage.getItem('twaHelicopterRoutesV1')||'{}')}catch{return {}}}
+function helicopterRouteKey(name,start,end){return name+'|'+start+'|'+end}
+function planHelicopterPoints(points,name){
+ const speed=assumptions[name].speed,lim=planningLimits[name],maxNM=speed*2.25;
+ if(!points.every(Boolean)||points.length<2||new Set(points.map(p=>p[0])).size!==points.length)return {ok:false,points:points.filter(Boolean),reason:'Saved route contains unknown or repeated airports.',maxNM,lim};
+ const legs=points.slice(1).map((to,i)=>({from:points[i],to,nm:distanceBetween(points[i],to),hours:distanceBetween(points[i],to)/speed}));
+ if(legs.some(l=>!Number.isFinite(l.hours)||l.hours>=2.25||l.nm<1))return {ok:false,points,reason:'Saved route has a sector of 2h 15m or longer. Ask Admin to update the route.',maxNM,lim};
+ let day=1,dailyHours=0;const overnights=[];
+ for(const leg of legs){if(dailyHours>0&&dailyHours+leg.hours>lim.daily+1e-8){overnights.push({airport:leg.from,day});day++;dailyHours=0;leg.overnightBefore=true}leg.day=day;dailyHours+=leg.hours}
+ return {ok:true,source:'admin',points,legs,overnights,days:day,lim,maxNM,maxLegHours:2.25,totalNM:legs.reduce((s,l)=>s+l.nm,0),totalHours:legs.reduce((s,l)=>s+l.hours,0)};
+}
+function selectedRoutePlan(start,end,name){
+ if(!isHelicopter(name))return smartRoute(start,end,name);
+ const saved=getHelicopterRoutes()[helicopterRouteKey(name,start[0],end[0])];
+ if(!saved)return smartRoute(start,end,name);
+ if(!Array.isArray(saved.codes)||saved.codes[0]!==start[0]||saved.codes[saved.codes.length-1]!==end[0])return {ok:false,points:[start,end],reason:'Saved route endpoints are invalid. Ask Admin to update the route.',maxNM:assumptions[name].speed*2.25,lim:planningLimits[name]};
+ return planHelicopterPoints(saved.codes.map(airportMatch),name);
+}
+function drawHelicopterRoutesAdmin(){
+ const target=document.getElementById('heliRoutesAdmin');if(!target)return;
+ const rows=Object.entries(getHelicopterRoutes()).filter(([,r])=>r&&Array.isArray(r.codes));
+ target.innerHTML='<table><thead><tr><th>Helicopter</th><th>Search route</th><th>Saved routing</th><th>Action</th></tr></thead><tbody>'+rows.map(([key,r],i)=>'<tr><td>'+esc(r.aircraft)+'</td><td>'+esc(r.codes[0])+' → '+esc(r.codes[r.codes.length-1])+'</td><td>'+esc(r.codes.join(' → '))+'</td><td><button type="button" class="btn secondary" id="removeHeliRoute'+i+'">Delete</button></td></tr>').join('')+(rows.length?'':'<tr><td colspan="4">No saved helicopter routes. Automatic refuel routing applies.</td></tr>')+'</tbody></table>';
+ rows.forEach(([key],i)=>document.getElementById('removeHeliRoute'+i).onclick=()=>deleteHelicopterRoute(key));
+}
+async function saveHelicopterRoute(){
+ const status=document.getElementById('heliRouteStatus');
+ if(!window.TWAAdminVerified||!window.TWAFirebase){status.textContent='Admin login required.';return}
+ const tokens=document.getElementById('heliRouteSequence').value.trim().toUpperCase().split(/[\s,;>→–—-]+/).filter(Boolean);
+ const points=tokens.map(airportMatch);
+ if(points.length<2||points.length>20||points.some(p=>!p)||new Set(points.map(p=>p[0])).size!==points.length){status.textContent='Enter 2–20 distinct supported airport codes, e.g. HLP-SRG-SUB.';return}
+ const choice=document.getElementById('heliRouteAircraft').value,names=choice==='both'?['Bell 412EP','AW109S Grand']:[choice],next={...getHelicopterRoutes()};
+ for(const name of names){
+  if(!isHelicopter(name)){status.textContent='Select a supported helicopter.';return}
+  const plan=planHelicopterPoints(points,name);if(!plan.ok){status.textContent=name+': '+plan.reason;return}
+  const sequences=[points.map(p=>p[0])];if(document.getElementById('heliRouteReverse').checked)sequences.push([...sequences[0]].reverse());
+  for(const codes of sequences)next[helicopterRouteKey(name,codes[0],codes[codes.length-1])]={aircraft:name,codes};
+ }
+ status.textContent='Saving route to Firebase…';
+ try{await window.TWAFirebase.saveConfig('helicopterRoutes',next);localStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));drawHelicopterRoutesAdmin();calculateEstimate();status.textContent='Helicopter route saved to Firebase.'}catch(e){status.textContent='Route save failed: '+e.message}
+}
+async function deleteHelicopterRoute(key){
+ if(!window.TWAAdminVerified||!window.TWAFirebase)return;
+ const status=document.getElementById('heliRouteStatus'),next={...getHelicopterRoutes(),[key]:null};
+ status.textContent='Deleting route from Firebase…';
+ try{await window.TWAFirebase.saveConfig('helicopterRoutes',next);localStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));drawHelicopterRoutesAdmin();calculateEstimate();status.textContent='Route deleted. Automatic refuel routing now applies.'}catch(e){status.textContent='Route deletion failed: '+e.message}
+}
+
 function priceForAircraft(name){
  const a=assumptions[name],start=airportMatch(from.value),end=airportMatch(to.value);if(!a||!num('distance')||!start||!end||start===end)return null;
  const helicopter=name==='Bell 412EP'||name==='AW109S Grand';
- const plan=helicopter?smartRoute(start,end,name):null;
+ const plan=helicopter?selectedRoutePlan(start,end,name):null;
  if(plan&&!plan.ok)return null;
  const legs=currentTrip==='Round Trip'?2:1,points=plan?plan.points:[start,end],nm=plan?plan.totalNM:num('distance'),hours=plan?plan.totalHours:nm/a.speed,totalHours=hours*legs+num('positioning'),sectors=(points.length-1)*legs;
  // Charge each visited airport once per journey direction, including fuel stops.
@@ -415,7 +467,7 @@ function offlineMap(points){
 }
 function routePlanningHTML(plan){
  if(!plan.ok)return `<div style="padding:13px;background:#fff1e7;border-radius:10px;color:#813c12"><strong>Manual route planning required.</strong> ${esc(plan.reason)} Indicative max leg ${plan.maxNM.toFixed(0)} NM.</div>`;
- return `<div style="background:#edf5fb;padding:13px;border-radius:12px;margin:12px 0"><strong>Suggested routing (subject to Operations approval)</strong><p class="small">${plan.maxLegHours?'Sector flight time < 2h 15m':'Endurance '+plan.lim.endurance+' h'} · daily flight cap ${plan.lim.daily} h · screening leg limit ${plan.maxNM.toFixed(0)} NM ${plan.maxLegHours?'(under 2h 15m)':'(75% endurance)'} · ${plan.days} day(s)</p>${plan.overnights.length?'<p><strong>Proposed overnight: '+plan.overnights.map(o=>esc(o.airport[2])+' ('+esc(o.airport[0])+') after Day '+o.day).join('; ')+'</strong></p>':'<p>No overnight required under the daily airborne-hour screen.</p>'}${plan.legs.map((l,i)=>`<div style="padding:7px 0;border-bottom:1px solid #d8e3ed">Day ${l.day}: ${esc(l.from[0])} → ${esc(l.to[0])} · ${l.nm.toFixed(0)} NM · ${timeLabel(l.hours)}${l.overnightBefore?' · Overnight before departure':''}${i<plan.legs.length-1?' · Proposed fuel stop':''}</div>`).join('')}<p class="small">Total proposed routing: ${plan.totalNM.toFixed(0)} NM · ${timeLabel(plan.totalHours)} airborne. Verify fuel reserve, terrain, permissions, border formalities, airport opening, fuel supply and crew duty limits.</p></div>`;
+ return `<div style="background:#edf5fb;padding:13px;border-radius:12px;margin:12px 0"><strong>${plan.source==='admin'?'Admin saved helicopter routing':'Automatic suggested routing'} (subject to Operations approval)</strong><p class="small">${plan.maxLegHours?'Sector flight time < 2h 15m':'Endurance '+plan.lim.endurance+' h'} · daily flight cap ${plan.lim.daily} h · screening leg limit ${plan.maxNM.toFixed(0)} NM ${plan.maxLegHours?'(under 2h 15m)':'(75% endurance)'} · ${plan.days} day(s)</p>${plan.overnights.length?'<p><strong>Proposed overnight: '+plan.overnights.map(o=>esc(o.airport[2])+' ('+esc(o.airport[0])+') after Day '+o.day).join('; ')+'</strong></p>':'<p>No overnight required under the daily airborne-hour screen.</p>'}${plan.legs.map((l,i)=>`<div style="padding:7px 0;border-bottom:1px solid #d8e3ed">Day ${l.day}: ${esc(l.from[0])} → ${esc(l.to[0])} · ${l.nm.toFixed(0)} NM · ${timeLabel(l.hours)}${l.overnightBefore?' · Overnight before departure':''}${i<plan.legs.length-1?' · Proposed fuel stop':''}</div>`).join('')}<p class="small">Total proposed routing: ${plan.totalNM.toFixed(0)} NM · ${timeLabel(plan.totalHours)} airborne. Verify fuel reserve, terrain, permissions, border formalities, airport opening, fuel supply and crew duty limits.</p></div>`;
 }
 
 // Historical AIP ENR 6-1-B (17 Sep 2015): visual reference only; NOT a VFR route database.
@@ -424,7 +476,7 @@ function aeronauticalReferenceHTML(){return `<details style="margin:12px 0;borde
 
 function initializeRouteMap(a,b,name){
  const el=document.getElementById('realRouteMap');if(!el)return;
- const plan=smartRoute(a,b,name);window.currentSmartRoute=plan;
+ const plan=selectedRoutePlan(a,b,name);window.currentSmartRoute=plan;
  el.innerHTML=offlineMap(plan.points)+aeronauticalReferenceHTML(); if(!plan.ok)el.insertAdjacentHTML('beforeend','<p class="small" style="color:#9a4b19;padding:8px">Direct line is for geographic reference only. No feasible multi-leg itinerary established.</p>');
  const detail=document.getElementById('smartRouteDetails');if(detail)detail.innerHTML=routePlanningHTML(plan);
 }
@@ -468,7 +520,7 @@ function airportRate(raw){const a=typeof airportMatch==='function'?airportMatch(
 function handlingTotal(legs){return airportRate(from.value)+airportRate(to.value)+(legs===2?airportRate(to.value):0)}
 async function adminSignIn(){if(!window.TWAFirebase){adminError.textContent='Firebase is still loading or unavailable. Open the site using HTTPS and check your connection.';return}try{await window.TWAFirebase.adminLogin(adminUser.value.trim(),adminPass.value);adminPass.value='';adminError.textContent='';syncAdminView()}catch(e){adminError.textContent='Firebase login failed: '+(e.code||e.message)}}
 async function adminSignOut(){if(window.TWAFirebase)await window.TWAFirebase.adminLogout();adminPass.value='';syncAdminView()}
-function syncAdminView(){const ok=!!window.TWAAdminVerified;adminGate.classList.toggle('hidden',ok);adminWorkspace.classList.toggle('hidden',!ok);if(ok){drawAdminCosts();drawFleetPhotoAdmin();render()}}
+function syncAdminView(){const ok=!!window.TWAAdminVerified;adminGate.classList.toggle('hidden',ok);adminWorkspace.classList.toggle('hidden',!ok);if(ok){drawAdminCosts();drawFleetPhotoAdmin();drawHelicopterRoutesAdmin();render()}}
 let adminPricingCurrency=readCostConfig().adminCurrency==='IDR'?'IDR':'USD';
 const nonMoneyFields=new Set(['parkingDays','crewDays','positioning','service','tax']);
 const US_GAL_TO_LITER=3.785411784;
@@ -609,6 +661,7 @@ const configs=doc(db,'publicSettings','bookingApp');
 const reportError=e=>{console.error('Transwisata Firebase:',e);};
 function refreshLocalPublic(data){
  try{
+  if(data.helicopterRoutes){localStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(data.helicopterRoutes));window.drawHelicopterRoutesAdmin?.();window.calculateEstimate?.();}
   if(data.costs){localStorage.setItem('twaCostConfig',JSON.stringify(data.costs));window.applyCostConfig?.();}
   if(data.fleetSpecs){localStorage.setItem('twaFleetSpecsV1',JSON.stringify(data.fleetSpecs));window.renderFleetPrices?.();window.drawFleetSpecsAdmin?.();}
   if(data.photos){localStorage.setItem('twaFleetPhotosV1',JSON.stringify(data.photos));window.applyFleetPhotos?.();window.drawFleetPhotoAdmin?.();}
