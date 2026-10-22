@@ -25,9 +25,8 @@ jobs:
           enablement: true
       - name: Prepare static application
         run: |
-          mkdir -p _site
-          cp index.html _site/index.html
-          touch _site/.nojekyll
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python scripts/build_pwa.py
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
