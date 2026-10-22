@@ -54,6 +54,19 @@ async function refreshCompanyInstallManifest(config){
  }catch(error){console.warn('Company install manifest:',error.message)}
 }
 
+let faviconRevision=0;
+async function refreshCompanyFavicon(source){
+ const revision=++faviconRevision,link=document.querySelector('link[rel="icon"]');
+ // Keep a versioned, correctly sized PNG fallback while a custom image is decoded.
+ link.type='image/png';link.setAttribute('sizes','32x32');
+ link.href=new URL('assets/favicon-32.png?v=20261022-3',location.href).href;
+ if(!source)return;
+ try{
+  const blob=await pngIcon(source,32),data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob)});
+  if(revision===faviconRevision)link.href=data;
+ }catch(error){console.warn('Company favicon:',error.message)}
+}
+
 function setText(id,text){const node=el(id);if(node)node.textContent=text}
 function applyFleet(config,preview=false){
  const next=config.fleet.filter(r=>r.active),signature=JSON.stringify([config.fleet,preview]);
@@ -87,7 +100,8 @@ window.applyCompanyCustomization=function(input,options={}){
  style.textContent='body{background:'+config.background+'!important;color:'+config.text+'}header,footer{background:'+config.primary+'!important}.hero{background:linear-gradient(110deg,'+config.primary+','+config.primary+'d9)!important}.btn:not(.secondary){background:'+config.accent+'!important}.tabs button.active{background:'+config.primary+'!important}.hero>div>span{color:'+config.accent+'!important}#fleet .fleet-detail{background:'+config.primary+'!important}#fleet .fleet-price{color:'+config.primary+'!important}.summary-strip.premium-route{background:'+config.primary+'!important}';
  el('appBrandLogo').src=config.logoData||new URL('assets/logo.png',location.href).href;
  const icon=config.iconData||config.logoData;
- document.querySelector('link[rel="icon"]').href=icon||new URL('assets/icon-192.png',location.href).href;document.querySelector('link[rel="apple-touch-icon"]').href=icon||new URL('assets/apple-touch-icon.png',location.href).href;
+ refreshCompanyFavicon(icon);
+ document.querySelector('link[rel="apple-touch-icon"]').href=icon||new URL('assets/apple-touch-icon.png',location.href).href;
  applyFleet(config,!!options.preview);
  if(!options.preview)refreshCompanyInstallManifest(config);
  const status=el('saConnection');if(status)status.textContent='Project aktif: '+(window.TWA_BOOTSTRAP?.firebase?.projectId||'default');
@@ -189,7 +203,7 @@ window.exportCompanyApp=async function(){
   const source=config.iconData||config.logoData||URL.createObjectURL(originalLogo);
   try{
    zip.file('assets/logo.png',await pngIcon(config.logoData||source,512));
-   for(const [name,size,mask] of [['icon-192.png',192,false],['icon-512.png',512,false],['icon-maskable-512.png',512,true],['apple-touch-icon.png',180,false]])zip.file('assets/'+name,await pngIcon(source,size,mask));
+   for(const [name,size,mask] of [['favicon-32.png',32,false],['icon-192.png',192,false],['icon-512.png',512,false],['icon-maskable-512.png',512,true],['apple-touch-icon.png',180,false]])zip.file('assets/'+name,await pngIcon(source,size,mask));
   }finally{if(source.startsWith('blob:'))URL.revokeObjectURL(source)}
   const manifest={id:'./',name:config.appName,short_name:config.companyName.slice(0,20),start_url:'./',scope:'./',display:'standalone',background_color:config.background,theme_color:config.primary,icons:[{src:'assets/icon-192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'assets/icon-512.png',sizes:'512x512',type:'image/png',purpose:'any'},{src:'assets/icon-maskable-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}]};
   zip.file('manifest.webmanifest',JSON.stringify(manifest,null,2));
