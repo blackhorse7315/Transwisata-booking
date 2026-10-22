@@ -36,18 +36,36 @@ function validateConfig(input){
  return out;
 }
 window.validateCompanyConfig=validateConfig;
+
+let companyInstallRevision=0;
+async function refreshCompanyInstallManifest(config){
+ if(!('serviceWorker' in navigator))return;
+ const revision=++companyInstallRevision;
+ try{
+  const source=config.iconData||config.logoData||new URL('assets/icon-512.png',location.href).href;
+  const asData=blob=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob)});
+  const icons=await Promise.all([[192,false],[512,false],[512,true]].map(async([size,mask])=>({src:await asData(await pngIcon(source,size,mask)),sizes:size+'x'+size,type:'image/png',purpose:mask?'maskable':'any'})));
+  if(revision!==companyInstallRevision)return;
+  const registration=await navigator.serviceWorker.ready;if(!registration.active||revision!==companyInstallRevision)return;
+  const channel=new MessageChannel();
+  await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Manifest update timed out')),5000);channel.port1.onmessage=()=>{clearTimeout(timeout);resolve()};registration.active.postMessage({type:'company-branding',branding:{name:config.appName,short_name:config.companyName.slice(0,20),theme_color:config.primary,background_color:config.background,icons}},[channel.port2])});
+  channel.port1.close();
+  if(revision===companyInstallRevision)document.querySelector('link[rel="manifest"]').href=new URL('manifest.webmanifest?company='+Date.now(),location.href).href;
+ }catch(error){console.warn('Company install manifest:',error.message)}
+}
+
 function setText(id,text){const node=el(id);if(node)node.textContent=text}
-function applyFleet(config){
- const next=config.fleet.filter(r=>r.active),signature=JSON.stringify(config.fleet);
+function applyFleet(config,preview=false){
+ const next=config.fleet.filter(r=>r.active),signature=JSON.stringify([config.fleet,preview]);
  if(window.TWAFleetSignature===signature)return;
- window.TWAFleetSignature=signature;window.TWACustomFleet=clone(config.fleet);
+ window.TWAFleetSignature=signature;window.TWAFleetPreview=preview;window.TWACustomFleet=clone(config.fleet);
  const costs=readCostConfig(),savedSpecs=fleetSpecs(),currentPlane=el('plane').value;
  aircraft.splice(0,aircraft.length,...next.map(r=>[r.name,r.description,r.registration]));
  for(const key of Object.keys(assumptions))delete assumptions[key];
  for(const key of Object.keys(fleetSpecDefaults))delete fleetSpecDefaults[key];
  for(const key of Object.keys(planningLimits))delete planningLimits[key];
  for(const r of next){
-  assumptions[r.name]={speed:r.planningSpeed,rate:costs.aircraft?.[r.name]?.rate??r.rateUSD,burn:costs.aircraft?.[r.name]?.burn??r.burnLiters/3.785411784};
+  assumptions[r.name]={speed:r.planningSpeed,rate:preview?r.rateUSD:costs.aircraft?.[r.name]?.rate??r.rateUSD,burn:preview?r.burnLiters/3.785411784:costs.aircraft?.[r.name]?.burn??r.burnLiters/3.785411784};
   fleetSpecDefaults[r.name]={speed:r.cruiseSpeed,endurance:r.endurance,seats:r.seats,range:r.range};
   planningLimits[r.name]={endurance:r.endurance,daily:r.dailyHours};
  }
@@ -58,7 +76,7 @@ function applyFleet(config){
  applyFleetPhotos();renderFleetPrices();updateHoldUI();
  if(window.TWAAdminVerified){drawAdminCosts();drawFleetSpecsAdmin();drawFleetPhotoAdmin()}
 }
-window.applyCompanyCustomization=function(input){
+window.applyCompanyCustomization=function(input,options={}){
  let config;try{config=validateConfig({...defaults,...input})}catch(error){console.error('Company configuration:',error.message);return}
  liveConfig=config;
  const ids={companyName:'appCompanyName',tagline:'appTagline',eyebrow:'appEyebrow',heroTitle:'appHeroTitle',heroText:'appHeroText',fleetTitle:'appFleetTitle',fleetIntro:'appFleetIntro',fleetNote:'appFleetNote',footer:'appFooter',bookLabel:'appBookNav',trackLabel:'appTrackNav',adminLabel:'appAdminNav',installLabel:'appInstallButton'};
@@ -70,7 +88,8 @@ window.applyCompanyCustomization=function(input){
  if(config.logoData)el('appBrandLogo').src=config.logoData;
  const icon=config.iconData||config.logoData;
  if(icon){document.querySelector('link[rel="icon"]').href=icon;document.querySelector('link[rel="apple-touch-icon"]').href=icon}
- applyFleet(config);
+ applyFleet(config,!!options.preview);
+ if(!options.preview)refreshCompanyInstallManifest(config);
  const status=el('saConnection');if(status)status.textContent='Project aktif: '+(window.TWA_BOOTSTRAP?.firebase?.projectId||'default');
 };
 function formMarkup(){
@@ -132,7 +151,7 @@ function ensureSuper(){if(!window.TWASuperAdminVerified)throw Error('Login Super
 function checkActiveFleetChanges(next){
  for(const [name,hold] of Object.entries(cleanHolds())){const old=aircraft.find(a=>a[0]===name);if(!old)continue;const match=next.fleet.find(r=>r.registration===old[2]&&r.name===name&&r.active);if(!match)throw Error('Lepaskan hold '+name+' sebelum menghapus, menonaktifkan, atau mengganti nama/registrasinya.')}
 }
-window.previewSuperAdminConfig=function(){try{ensureSuper();const current=liveConfig,next=collectConfig();checkActiveFleetChanges(next);applyCompanyCustomization(next);liveConfig=current;message('Pratinjau pada perangkat ini. Klik Simpan untuk semua perangkat.')}catch(e){message(e.message)}};
+window.previewSuperAdminConfig=function(){try{ensureSuper();const current=liveConfig,next=collectConfig();checkActiveFleetChanges(next);applyCompanyCustomization(next,{preview:true});liveConfig=current;message('Pratinjau pada perangkat ini. Klik Simpan untuk semua perangkat.')}catch(e){message(e.message)}};
 window.cancelSuperAdminPreview=function(){applyCompanyCustomization(liveConfig);syncSuperAdminView();message('Pratinjau dibatalkan.')};
 window.saveSuperAdminConfig=async function(){
  try{ensureSuper();const next=collectConfig();checkActiveFleetChanges(next);message('Menyimpan konfigurasi…');await window.TWAFirebase.saveCustomization(next);applyCompanyCustomization(next);message('Konfigurasi tersimpan dan diperbarui pada perangkat lain. Ikon instalasi mengikuti paket publikasi.')}catch(e){message('Gagal menyimpan: '+(e.code||e.message))}
@@ -158,7 +177,7 @@ window.importSuperAdminConfig=async function(input){
 };
 async function readAsset(path,type='text'){const response=await fetch(new URL(path,location.href),{cache:'no-store'});if(!response.ok)throw Error('File paket gagal dibaca: '+path);return type==='blob'?response.blob():response.text()}
 async function pngIcon(source,size,maskable=false){
- const image=await imageFrom(source),canvas=document.createElement('canvas');canvas.width=canvas.height=size;const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,size,size);const area=size*(maskable?.6:.84),scale=Math.min(area/image.width,area/image.height),w=image.width*scale,h=image.height*scale;ctx.drawImage(image,(size-w)/2,(size-h)/2,w,h);return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+ const image=await imageFrom(source),canvas=document.createElement('canvas');canvas.width=canvas.height=size;const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,size,size);const area=size*(maskable ? 0.6 : 0.84),scale=Math.min(area/image.width,area/image.height),w=image.width*scale,h=image.height*scale;ctx.drawImage(image,(size-w)/2,(size-h)/2,w,h);return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
 }
 window.exportCompanyApp=async function(){
  try{
@@ -175,12 +194,12 @@ window.exportCompanyApp=async function(){
   const manifest={id:'./',name:config.appName,short_name:config.companyName.slice(0,20),start_url:'./',scope:'./',display:'standalone',background_color:config.background,theme_color:config.primary,icons:[{src:'assets/icon-192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'assets/icon-512.png',sizes:'512x512',type:'image/png',purpose:'any'},{src:'assets/icon-maskable-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}]};
   zip.file('manifest.webmanifest',JSON.stringify(manifest,null,2));
   zip.file('firestore.rules',rules.replace(/'cIHf6R5zNST1vjwa64zxTgyladm1'/g,JSON.stringify(bootstrap.superAdminUid)).replace(/request.auth.uid in \[[^\]]*\]; \/\/ COMPANY_ADMIN_UIDS/,'request.auth.uid in '+JSON.stringify([...new Set([bootstrap.superAdminUid,...bootstrap.adminUids])])+'; // COMPANY_ADMIN_UIDS'));
-  zip.file('README.txt','COMPANY APP PACKAGE\\n1. Create Firebase Authentication accounts; enable Email/Password and Anonymous.\\n2. Confirm UIDs in app-config.js and firestore.rules.\\n3. Publish firestore.rules in the TARGET Firebase project.\\n4. Upload all package files to an HTTPS static host. No build required.\\n5. Sign in as Super Admin and Save Configuration to publish defaults to Firestore.\\nThis package contains no customer records and does not migrate accounts or payments.\\n');
+  zip.file('README.txt','COMPANY APP PACKAGE\n1. Create Firebase Authentication accounts; enable Email/Password and Anonymous.\n2. Confirm UIDs in app-config.js and firestore.rules.\n3. Publish firestore.rules in the TARGET Firebase project.\n4. Upload all package files to an HTTPS static host. No build required.\n5. Sign in as Super Admin and Save Configuration to publish defaults to Firestore.\nThis package contains no customer records and does not migrate accounts or payments.\n');
   const blob=await zip.generateAsync({type:'blob'});download('company-app-'+bootstrap.firebase.projectId+'.zip',blob,'application/zip');message('Paket siap diunggah ke hosting HTTPS. Terapkan rules pada Firebase tujuan sebelum login.');
  }catch(e){message('Ekspor gagal: '+e.message)}
 };
 window.getCurrentCompanyConfig=()=>clone(liveConfig);
-window.addEventListener('beforeunload',()=>{});
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('controllerchange',()=>refreshCompanyInstallManifest(liveConfig));
 applyCompanyCustomization(window.TWA_BOOTSTRAP?.initialCustomization||defaults);
 syncSuperAdminView();
 })();
