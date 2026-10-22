@@ -2,18 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function isAdmin() {
+    function isSuperAdmin() {
       return signedIn() && request.auth.uid == 'cIHf6R5zNST1vjwa64zxTgyladm1';
+    }
+    function isAdmin() {
+      return signedIn() && request.auth.uid in ['cIHf6R5zNST1vjwa64zxTgyladm1']; // COMPANY_ADMIN_UIDS
+    }
+    match /privateSuperAdmin/{documentId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+    match /publicFleetPhotos/{registration} {
+      allow read: if true;
+      allow write: if isAdmin() || isSuperAdmin();
     }
     match /publicSettings/bookingApp {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isSuperAdmin() || (isAdmin() && !request.resource.data.keys().hasAny(['customization']));
+      allow update: if isSuperAdmin() || (isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['customization']));
+      allow delete: if isSuperAdmin();
     }
     match /privateAdmin/{documentId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || isSuperAdmin();
     }
     match /bookingRequests/{bookingId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isSuperAdmin();
       allow create: if signedIn()
         && request.resource.data.keys().hasAll(['ref','name','email','phone','from','to','date','time','pax','plane','purpose','trip','returnDate','stops','notes','company','status','estimate','createdAt','createdBy'])
         && request.resource.data.keys().hasOnly(['ref','name','email','phone','from','to','date','time','pax','plane','purpose','trip','returnDate','stops','notes','company','status','estimate','createdAt','createdBy'])
@@ -28,19 +41,24 @@ service cloud.firestore {
         && request.resource.data.email.size() <= 254
         && request.resource.data.phone is string
         && request.resource.data.phone.size() <= 50;
-      allow update: if isAdmin()
+      allow update: if (isAdmin() || isSuperAdmin())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.status in ['Request Received','Under Review','Quotation Sent','Pending Confirmation','Confirmed','Cancelled'];
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSuperAdmin();
     }
     // Only public availability fields are stored here; no customer contact details.
     match /fleetHolds/{registration} {
       function validAircraft() {
-        return (registration == 'PK-TWY' && request.resource.data.plane == 'Gulfstream IV-SP')
+        let settings = get(/databases/$(database)/documents/publicSettings/bookingApp).data;
+        let customized = settings is map && 'customization' in settings && 'fleetByReg' in settings.customization;
+        return (customized && registration in settings.customization.fleetByReg
+          && settings.customization.fleetByReg[registration].active == true
+          && settings.customization.fleetByReg[registration].name == request.resource.data.plane)
+          || (!customized && ((registration == 'PK-TWY' && request.resource.data.plane == 'Gulfstream IV-SP')
           || (registration == 'PK-TWX' && request.resource.data.plane == 'King Air 350i')
           || (registration == 'PK-TWW' && request.resource.data.plane == 'CASA 212-200')
           || (registration == 'PK-TWV' && request.resource.data.plane == 'Bell 412EP')
-          || (registration == 'PK-TWZ' && request.resource.data.plane == 'AW109S Grand');
+          || (registration == 'PK-TWZ' && request.resource.data.plane == 'AW109S Grand')));
       }
       function validHold() {
         return request.resource.data.keys().hasAll(['plane','owner','status','expires','updatedAt'])
@@ -61,7 +79,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if newPendingHold();
       allow update: if validHold() && (
-        isAdmin()
+        (isAdmin() || isSuperAdmin())
         || (newPendingHold() && (
           resource.data.status == 'released'
           || (resource.data.status == 'pending' && resource.data.expires <= request.time.toMillis())
@@ -71,7 +89,7 @@ service cloud.firestore {
           && request.resource.data.status == 'released'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']))
       );
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSuperAdmin();
     }
     match /{document=**} { allow read, write: if false; }
   }

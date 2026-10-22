@@ -7,7 +7,7 @@ from PIL import Image, ImageOps
 
 root = Path("_site")
 root.mkdir(exist_ok=True)
-for name in ("index.html", "manifest.webmanifest"):
+for name in ("index.html", "manifest.webmanifest", "customization.js", "app-config.js", "firestore.rules"):
     shutil.copyfile(name, root / name)
 (root / "sw.js").write_text(Path("sw.js").read_text().replace("__BUILD_VERSION__", os.environ["GITHUB_SHA"]), encoding="utf-8")
 (root / ".nojekyll").touch()
