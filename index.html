@@ -673,7 +673,7 @@ const fleetSpecDefaults={
  'Bell 412EP':{speed:122,endurance:3.0,seats:13,range:350},
  'AW109S Grand':{speed:145,endurance:3.0,seats:6,range:450}
 };
-function fleetSpecs(){let saved={};try{saved=JSON.parse(tenantStorage.getItem(fleetSpecKey)||'{}')}catch(e){}return Object.fromEntries(Object.entries(fleetSpecDefaults).map(([k,v])=>[k,{...v,...(saved[k]||{})}]))}
+function fleetSpecs(){let saved={};try{saved=JSON.parse(tenantStorage.getItem(fleetSpecKey)||'{}')}catch(e){}return Object.fromEntries(Object.entries(fleetSpecDefaults).map(([k,v])=>[k,{...v,...(window.TWAFleetPreview?{}:saved[k]||{})}]))}
 function fleetSpecsMarkup(name){const d=fleetSpecs()[name];const v=(n)=>Number(n).toLocaleString('en-US');const icons={speed:`<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 25a13 13 0 1 1 22 0"/><path d="M8 22l-3-2M9 13l-3-2M16 8V4M23 13l3-2M25 21l3-2"/><path d="M16 21l7-9"/><circle cx="16" cy="21" r="2.6" fill="currentColor" stroke="none"/></svg>`,endurance:`<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="12"/><path d="M16 8v9l7 4"/></svg>`,seats:`<svg viewBox="0 0 32 32" aria-hidden="true" fill="currentColor"><circle cx="12" cy="5" r="4"/><path d="M7 11h9c2 0 3 2 3 4v6h8a2 2 0 0 1 0 4H17c-3 0-5-2-5-5v-4h-1v8h17v3H8a3 3 0 0 1-3-3V14c0-2 1-3 2-3Z"/></svg>`,range:`<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="16" cy="16" r="12"/><ellipse cx="16" cy="16" rx="5.7" ry="12"/><path d="M4 16h24M7 9h18M7 23h18"/></svg>`};return `<div class="fleet-spec-row">${[['speed','Cruise Speed',v(d.speed)+' kts'],['endurance','Endurance',enduranceToHHMM(d.endurance)],['seats','Seats',v(d.seats)],['range','Max Range',v(d.range)+' NM']].map(([key,label,value])=>`<div class="fleet-spec">${icons[key]}<span><small>${label}</small><strong>${value}</strong></span></div>`).join('')}</div>`}
 function enduranceToHHMM(hours){
  const minutes=Math.round(Math.max(0,Number(hours)||0)*60);
@@ -987,11 +987,11 @@ async function holdUser(){
  holdOwner=auth.currentUser.uid;return auth.currentUser;
 }
 function holdReference(name){
- const entry=aircraft.find(a=>a[0]===name);if(!entry)throw Error('Unknown aircraft.');
- return doc(db,'fleetHolds',entry[2]);
+ const entry=aircraft.find(a=>a[0]===name),archived=window.TWACloudHolds?.[name];if(!entry&&!archived?.registration)throw Error('Unknown aircraft.');
+ return doc(db,'fleetHolds',entry?entry[2]:archived.registration);
 }
 onSnapshot(collection(db,'fleetHolds'),{includeMetadataChanges:true},snapshot=>{
- window.TWACloudHolds=Object.fromEntries(snapshot.docs.map(s=>{const v=s.data();return [v.plane,v]}));
+ window.TWACloudHolds=Object.fromEntries(snapshot.docs.map(s=>{const v=s.data();return [v.plane,{...v,registration:s.id}]}));
  window.TWAHoldsReady=!snapshot.metadata.fromCache;
  window.TWAHoldsError='';window.updateHoldUI?.();window.updatePaymentTimer?.();
 },error=>{
@@ -1001,7 +1001,7 @@ onSnapshot(collection(db,'fleetHolds'),{includeMetadataChanges:true},snapshot=>{
 
 window.TWAFirebase={
  verifySuperAdmin:async()=>{const user=auth.currentUser;if(!user||user.isAnonymous)throw Error('Super Admin sign-in required.');await getDoc(doc(db,'privateSuperAdmin','accessCheck'));window.TWASuperAdminVerified=true;window.syncSuperAdminView?.();},
- saveCustomization:async value=>{if(!window.TWASuperAdminVerified)throw Error('Super Admin required.');await setDoc(configs,{customization:value},{mergeFields:['customization']});},
+ saveCustomization:async value=>{if(!window.TWASuperAdminVerified)throw Error('Super Admin required.');const costs={...readCostConfig(),aircraft:Object.fromEntries(value.fleet.filter(r=>r.active).map(r=>[r.name,{rate:r.rateUSD,burn:r.burnLiters/3.785411784}]))};const specs=Object.fromEntries(value.fleet.filter(r=>r.active).map(r=>[r.name,{speed:r.cruiseSpeed,endurance:r.endurance,seats:r.seats,range:r.range}]));await setDoc(configs,{customization:value,costs,fleetSpecs:specs},{mergeFields:['customization','costs','fleetSpecs']});},
  testCompanyFirebase:async config=>{const testApp=initializeApp(config,'company-test-'+Date.now());try{await getDoc(doc(getFirestore(testApp),'publicSettings','bookingApp'))}finally{await deleteApp(testApp)}},
  reserveAircraft:async(name,previous)=>{
   const user=await holdUser(),target=holdReference(name),old=previous&&previous!==name?holdReference(previous):null;
