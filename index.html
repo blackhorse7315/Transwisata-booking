@@ -158,7 +158,7 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
 <div class="actions"><button type="button" class="btn" onclick="saveManualFuelPrice()">Save Airport Fuel Price</button></div>
 <label for="fuelImportFile" style="margin-top:20px">Import supplier price list (PDF / CSV / TXT · max 15 MB)</label>
 <input id="fuelImportFile" type="file" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" onchange="importFuelFile(this)">
-<p class="small">Pertamina CSV columns: airport,internationalUSCentsPerLiter,domesticIDRPerLiter,domesticMultiIDRPerLiter. International CSV: airport,currency,pricePerLiter. Set the effective dates above. PDF import detects the three Pertamina price columns by header position when available; blank or ambiguous values must be entered manually. Scanned PDFs require OCR or manual input.</p>
+<p class="small">Pertamina CSV columns: airport,internationalUSCentsPerLiter,domesticIDRPerLiter,domesticMultiIDRPerLiter. International CSV: airport,currency,pricePerLiter. Set the effective dates above. PDF import reads the three prices after the airport code in Pertamina order: International, Domestic, Domestic Multi. Header positions are used as a fallback. Review the populated values before saving. Scanned PDFs require OCR or manual input.</p>
 <p id="fuelImportStatus" class="small" role="status" aria-live="polite"></p>
 <details><summary>Extracted document text</summary><textarea id="fuelImportText" readonly style="height:180px"></textarea></details>
 <div id="fuelImportPreview" style="overflow:auto"></div>
@@ -561,6 +561,22 @@ function detectFuelTextRows(text){
 
 let fuelPDFLayout=[];
 function fillPertaminaColumns(rows,layout){
+ // Standard Pertamina rows finish with IATA/ICAO followed by the three prices.
+ // Parse these directly even when PDF headers are split into separate text items.
+ for(const row of rows){
+  const airport=airportMatch(row.airport);if(!airport)continue;
+  const codes=[airport[0],airport[1]].filter(Boolean).join('|');
+  const codeMatches=[...row.line.matchAll(new RegExp('(?:^|\\s)('+codes+')(?=\\s|$)','gi'))];
+  if(!codeMatches.length)continue;
+  const last=codeMatches[codeMatches.length-1],tail=row.line.slice(last.index+last[0].length).trim();
+  const numeric=tail.match(/\d[\d.,]*/g)||[];
+  const remainder=tail.replace(/\d[\d.,]*/g,'');
+  if(numeric.length!==3||!/^[\s|;*†‡]*$/.test(remainder))continue;
+  const values=numeric.map(parseSupplierNumber);
+  if(values.some(v=>!Number.isFinite(v)||v<=0))continue;
+  [row.international,row.domestic,row.multi]=values;
+  row.threeColumnDetected=true;
+ }
  const pages=[...new Set(layout.map(r=>r.page))];
  for(const page of pages){
   const pageRows=layout.filter(r=>r.page===page),items=pageRows.flatMap(r=>r.items);
@@ -570,12 +586,13 @@ function fillPertaminaColumns(rows,layout){
   if(international.length!==1||domestic.length!==2||international[0]>=domestic[0])continue;
   const centers=[international[0],...domestic];
   for(const row of rows){
+   if(row.threeColumnDetected)continue;
    const line=pageRows.find(r=>r.text===row.line);if(!line)continue;
    const cols=[[],[],[]];
    for(const item of line.items){
     const raw=item.text.trim();if(!/^\d[\d.,]*$/.test(raw))continue;
     const value=parseSupplierNumber(raw);if(!Number.isFinite(value)||value<=0)continue;
-    let index=centers.reduce((best,x,i)=>Math.abs(item.center-x)<Math.abs(item.center-centers[best])?i:best,0);
+    const index=centers.reduce((best,x,i)=>Math.abs(item.center-x)<Math.abs(item.center-centers[best])?i:best,0);
     if(item.center<centers[0]-(centers[1]-centers[0])/2||item.center>centers[2]+(centers[2]-centers[1])/2)continue;
     cols[index].push(value);
    }
@@ -598,7 +615,7 @@ async function importFuelFile(input){
   if(isPDF&&document.getElementById('fuelScope').value==='ID')fillPertaminaColumns(fuelImportRows,fuelPDFLayout);
   if(!document.getElementById('fuelSourceName').value.trim())document.getElementById('fuelSourceName').value=file.name;
   drawFuelImportPreview();
-  status.textContent=fuelImportRows.length?'Review '+fuelImportRows.length+' detected row(s). Select only the correct Jet A-1 rows and verify prices, currency, units and effective dates.':'No unambiguous airport rows found. Review extracted text and use manual entry or CSV.';
+  status.textContent=fuelImportRows.length?'Review '+fuelImportRows.length+' detected row(s). Select the correct Jet A-1 rows and verify all three prices and effective dates before saving.':'No unambiguous airport rows found. Review extracted text and use manual entry or CSV.';
  }catch(e){status.textContent='Import failed: '+e.message}
 }
 function drawFuelImportPreview(){
