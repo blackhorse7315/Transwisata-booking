@@ -1033,11 +1033,11 @@ window.TWAFirebase={
  uploadPhoto:async(reg,dataUrl)=>{
   if(!window.TWAAdminVerified)throw Error('Administrator authentication required');
   if(!aircraft.some(a=>a[2]===reg)||!dataUrl.startsWith('data:image/jpeg;base64,')||dataUrl.length>120000)throw Error('Invalid or oversized shared photo.');
-  await setDoc(doc(db,'publicFleetPhotos',reg),{url:dataUrl,updatedAt:serverTimestamp()});return dataUrl;
+  try{await setDoc(doc(db,'publicFleetPhotos',reg),{url:dataUrl,updatedAt:serverTimestamp()})}catch(e){if(e.code!=='permission-denied')throw e;await setDoc(configs,{photos:{[reg]:dataUrl}},{merge:true})}return dataUrl;
  },
  deletePhoto:async(reg)=>{
   if(!window.TWAAdminVerified)throw Error('Administrator authentication required');
-  await setDoc(doc(db,'publicFleetPhotos',reg),{url:null,updatedAt:serverTimestamp()});
+  try{await setDoc(doc(db,'publicFleetPhotos',reg),{url:null,updatedAt:serverTimestamp()})}catch(e){if(e.code!=='permission-denied')throw e;await setDoc(configs,{photos:{[reg]:null}},{merge:true})}
  },
  createBooking:async(item)=>{
   if(!auth.currentUser)await signInAnonymously(auth);
