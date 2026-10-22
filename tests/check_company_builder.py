@@ -7,7 +7,7 @@ server=subprocess.Popen(["python","-m","http.server","8765","--directory","_site
 try:
     time.sleep(1)
     with sync_playwright() as p:
-        browser=p.chromium.launch()
+        browser=p.chromium.launch(executable_path=os.environ.get("CHROME_BIN"))
         page=browser.new_page(accept_downloads=True)
         errors=[]
         page.on("pageerror",lambda error: errors.append(str(error)))
