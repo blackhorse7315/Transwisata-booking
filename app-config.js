@@ -9,7 +9,7 @@ window.TWA_BOOTSTRAP = {
     "appId": "1:488548515782:web:4bd8214637d61069efbcc7",
     "measurementId": "G-QLN8QJS20D"
   },
-  "superAdminUid": "cIHf6R5zNST1vjwa64zxTgyladm1",
+  "superAdminUid": "9AM94kN7gba5U4Si7BmARpXnstD3",
   "adminUids": [
     "cIHf6R5zNST1vjwa64zxTgyladm1"
   ]

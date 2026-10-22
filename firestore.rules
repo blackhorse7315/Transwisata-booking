@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isSuperAdmin() {
-      return signedIn() && request.auth.uid == 'cIHf6R5zNST1vjwa64zxTgyladm1';
+      return signedIn() && request.auth.uid == '9AM94kN7gba5U4Si7BmARpXnstD3';
     }
     function isAdmin() {
       return signedIn() && request.auth.uid in ['cIHf6R5zNST1vjwa64zxTgyladm1']; // COMPANY_ADMIN_UIDS
