@@ -138,6 +138,27 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
 <p class="small">Save preferred airport sequences for Bell 412EP and AW109S Grand only. Saved routes override automatic refuel routing. Admin routes can include sectors longer than 2h 15m. Daily airborne limits: Agusta 6 hours; Bell 412 7 hours. Additional sectors move to the next day when needed. A single sector cannot exceed the daily limit. The 2h 15m limit applies only to automatic refuel routing. Round trips return through the same airports in reverse order. Fuel supply and operational approval must be confirmed separately.</p>
 <div class="costgrid"><div><label for="heliRouteAircraft">Helicopter</label><select id="heliRouteAircraft"><option value="Bell 412EP">Bell 412</option><option value="AW109S Grand">Agusta (AW109S Grand)</option><option value="both">Bell 412 &amp; Agusta</option></select></div><div><label for="heliRouteFrom">From</label><input id="heliRouteFrom" placeholder="City / IATA / ICAO, e.g. HLP" autocomplete="off" aria-autocomplete="list"></div><div><label for="heliRouteTo">To</label><input id="heliRouteTo" placeholder="City / IATA / ICAO, e.g. PKU" autocomplete="off" aria-autocomplete="list"></div><div><label for="heliRouteSequence">Route / refuel airports</label><input id="heliRouteSequence" placeholder="e.g. HLP-TKG-DJB-PLM" autocomplete="off"><small class="small">From and To are included automatically when missing. Enter airports in flight order.</small></div><div><label for="heliRouteReverse">Also save reverse search route</label><input id="heliRouteReverse" type="checkbox" style="width:auto"> Save To → From with reversed routing</div></div>
 <div class="actions"><button class="btn" type="button" onclick="saveHelicopterRoute()">Save Helicopter Route</button></div><p id="heliRouteStatus" class="small" role="status" aria-live="polite"></p><div id="heliRoutesAdmin" style="overflow:auto"></div>
+<h3>Airport Fuel Prices · Pertamina &amp; International</h3>
+<p class="small">Store Jet A-1 / Avtur prices per liter by airport. Indonesia: upload a Pertamina price list. International: enter prices manually or import PDF / CSV / TXT. Review the extracted airport, currency and price column before saving. Include applicable supplier charges/taxes in the entered price. Import does not verify the supplier document.</p>
+<div class="costgrid">
+<div><label for="fuelScope">Price list</label><select id="fuelScope"><option value="ID">Indonesia · Pertamina</option><option value="INT">International</option></select></div>
+<div><label for="fuelCurrency">Fuel price currency</label><select id="fuelCurrency"><option>IDR</option><option>USD</option></select></div>
+<div><label for="fuelSourceName">Source / supplier</label><input id="fuelSourceName" placeholder="Pertamina, September 2026"></div>
+<div><label for="fuelEffectiveFrom">Effective from</label><input id="fuelEffectiveFrom" type="date"></div>
+<div><label for="fuelEffectiveTo">Effective until (optional)</label><input id="fuelEffectiveTo" type="date"></div>
+</div>
+<div class="costgrid"><div><label for="fuelAirport">Airport / location</label><input id="fuelAirport" placeholder="City / IATA / ICAO" autocomplete="off" aria-autocomplete="list"></div>
+<div><label for="fuelPriceLiter">Jet A-1 / Avtur price per liter</label><input id="fuelPriceLiter" type="number" min="0.000001" step="any" placeholder="e.g. 17500 or 1.25"></div></div>
+<div class="actions"><button type="button" class="btn" onclick="saveManualFuelPrice()">Save Airport Fuel Price</button></div>
+<label for="fuelImportFile" style="margin-top:20px">Import supplier price list (PDF / CSV / TXT · max 15 MB)</label>
+<input id="fuelImportFile" type="file" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" onchange="importFuelFile(this)">
+<p class="small">CSV columns: airport,currency,pricePerLiter — e.g. HLP,IDR,17500. Set the effective dates above. PDF text extraction may include several price columns; choose the appropriate Jet A-1 price explicitly. Scanned PDFs require OCR or manual input.</p>
+<p id="fuelImportStatus" class="small" role="status" aria-live="polite"></p>
+<details><summary>Extracted document text</summary><textarea id="fuelImportText" readonly style="height:180px"></textarea></details>
+<div id="fuelImportPreview" style="overflow:auto"></div>
+<div class="actions"><button type="button" class="btn" id="fuelImportSave" onclick="saveImportedFuelPrices()" disabled>Save Reviewed Import to Firebase</button></div>
+<p id="fuelSavedStatus" class="small" role="status" aria-live="polite"></p>
+<div id="airportFuelPricesAdmin" style="overflow:auto"></div>
 <h3>Ground Handling by Airport</h3><p class="small">Add an airport using its IATA (3-letter) or ICAO (4-letter) code. Airport-specific rates override the default handling rate for each airport movement.</p>
 <div class="costgrid"><div><label>Airport IATA / ICAO Code</label><input id="handlingAirport" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. HLP or WIHH"></div><div><label>Ground Handling (<span id="handlingCurrencyLabel">USD</span> / movement)</label><input id="handlingAmount" type="number" min="0" step="0.01" placeholder="350"></div></div><div class="actions"><button class="btn secondary" onclick="addHandlingRate()">Add / Update Airport Rate</button></div><div style="overflow:auto"><table><thead><tr><th>Airport</th><th>Code</th><th id="handlingTableCurrency">Handling USD / movement</th><th>Action</th></tr></thead><tbody id="handlingTable"></tbody></table></div>
 <div class="actions"><button class="btn" onclick="saveAdminCosts()">Save Cost Settings</button><button class="btn secondary" onclick="resetAdminCosts()">Reset to Demo Defaults</button></div><p id="adminSaved" class="small" aria-live="polite"></p>
@@ -315,7 +336,7 @@ function distanceNM(a,b){let rad=Math.PI/180,p1=a[3]*rad,p2=b[3]*rad,dp=(b[3]-a[
 function updateRoute(){let a=airportMatch(from.value),b=airportMatch(to.value),el=document.getElementById('routeInfo');if(a&&b&&a!==b){let nm=distanceNM(a,b);distance.value=nm.toFixed(1);el.textContent=`${a[2]} (${a[0]}/${a[1]}) → ${b[2]} (${b[0]}/${b[1]}) · ${nm.toFixed(1)} NM great-circle distance. Actual planned routing and flight time may differ.`;}else{distance.value='';el.textContent=a&&b?'Departure and destination must differ.':'Choose airports from the suggestions or enter a supported 3-letter IATA / 4-letter ICAO code. Unknown airports cannot be priced automatically.';}calculateEstimate()}
 // Mobile-friendly live airport suggestions (city, name, IATA, ICAO).
 const airportSearchStyle=document.createElement('style');airportSearchStyle.textContent=`.airport-search-wrap{position:relative}.airport-suggestions{position:absolute;z-index:1000;top:calc(100% + 4px);left:0;right:0;max-height:270px;overflow-y:auto;background:white;border:1px solid #d5e1ed;border-radius:12px;box-shadow:0 12px 30px #122d4b24}.airport-suggestions[hidden]{display:none}.airport-suggestion{display:block;width:100%;padding:12px 14px;text-align:left;border:0;border-bottom:1px solid #edf1f5;background:white;color:#172c44;cursor:pointer}.airport-suggestion small{display:block;color:#6a788a;margin-top:3px}.airport-suggestion:focus,.airport-suggestion:hover{background:#eef5fc}`;document.head.appendChild(airportSearchStyle);
-['from','to','handlingAirport','heliRouteFrom','heliRouteTo'].forEach(id=>{const input=document.getElementById(id),wrap=document.createElement('div'),menu=document.createElement('div');wrap.className='airport-search-wrap';menu.className='airport-suggestions';menu.hidden=true;menu.id=id+'Suggestions';menu.setAttribute('role','listbox');input.parentNode.insertBefore(wrap,input);wrap.append(input,menu);input.setAttribute('aria-controls',menu.id);input.setAttribute('aria-expanded','false');const close=()=>{menu.hidden=true;input.setAttribute('aria-expanded','false')};const refresh=()=>{const q=input.value.trim().toLowerCase();if(!q){close();return}const matches=airportData.filter(a=>[a[0],a[1],a[2]].some(x=>x.toLowerCase().includes(q))).slice(0,12);menu.replaceChildren();matches.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='airport-suggestion';b.setAttribute('role','option');const title=document.createElement('strong');title.textContent=a[2];const subtitle=document.createElement('small');subtitle.textContent=a[0]+' / '+a[1];b.append(title,subtitle);b.addEventListener('pointerdown',e=>e.preventDefault());b.addEventListener('click',()=>{input.value=a[0];close();if(id==='handlingAirport'){loadSelectedHandlingRate()}else if(id==='from'||id==='to'){updateRoute()}input.blur()});menu.appendChild(b)});menu.hidden=!matches.length;input.setAttribute('aria-expanded',String(matches.length>0))};input.addEventListener('input',refresh);input.addEventListener('focus',refresh);input.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='Enter'&&!menu.hidden){const b=menu.querySelector('button');if(b){e.preventDefault();b.click()}}});input.addEventListener('blur',()=>setTimeout(close,160))});
+['from','to','handlingAirport','fuelAirport','heliRouteFrom','heliRouteTo'].forEach(id=>{const input=document.getElementById(id),wrap=document.createElement('div'),menu=document.createElement('div');wrap.className='airport-search-wrap';menu.className='airport-suggestions';menu.hidden=true;menu.id=id+'Suggestions';menu.setAttribute('role','listbox');input.parentNode.insertBefore(wrap,input);wrap.append(input,menu);input.setAttribute('aria-controls',menu.id);input.setAttribute('aria-expanded','false');const close=()=>{menu.hidden=true;input.setAttribute('aria-expanded','false')};const refresh=()=>{const q=input.value.trim().toLowerCase();if(!q){close();return}const matches=airportData.filter(a=>[a[0],a[1],a[2]].some(x=>x.toLowerCase().includes(q))).slice(0,12);menu.replaceChildren();matches.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='airport-suggestion';b.setAttribute('role','option');const title=document.createElement('strong');title.textContent=a[2];const subtitle=document.createElement('small');subtitle.textContent=a[0]+' / '+a[1];b.append(title,subtitle);b.addEventListener('pointerdown',e=>e.preventDefault());b.addEventListener('click',()=>{input.value=a[0];close();if(id==='handlingAirport'){loadSelectedHandlingRate()}else if(id==='from'||id==='to'){updateRoute()}input.blur()});menu.appendChild(b)});menu.hidden=!matches.length;input.setAttribute('aria-expanded',String(matches.length>0))};input.addEventListener('input',refresh);input.addEventListener('focus',refresh);input.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='Enter'&&!menu.hidden){const b=menu.querySelector('button');if(b){e.preventDefault();b.click()}}});input.addEventListener('blur',()=>setTimeout(close,160))});
 
 ['from','to'].forEach(id=>document.getElementById(id).addEventListener('input',updateRoute));
 
@@ -381,6 +402,145 @@ async function deleteHelicopterRoute(key){
  try{await window.TWAFirebase.saveConfig('helicopterRoutes',next);localStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));drawHelicopterRoutesAdmin();calculateEstimate();status.textContent='Route deleted. Automatic refuel routing now applies.'}catch(e){status.textContent='Route deletion failed: '+e.message}
 }
 
+
+// Airport fuel prices are stored as original currency per liter; the legacy default remains USD/US gal.
+function getAirportFuelPrices(){try{return JSON.parse(localStorage.getItem('twaAirportFuelPricesV1')||'{}')}catch{return {}}}
+function isIndonesianAirport(a){return !!a&&/^(WI|WA)/.test(a[1])}
+function fuelPriceActive(record,day){
+ return !!record&&record.product==='Jet A-1'&&Number.isFinite(Number(record.pricePerLiter))&&Number(record.pricePerLiter)>0
+ &&['IDR','USD'].includes(record.currency)&&!!record.effectiveFrom
+ &&record.effectiveFrom<=day&&(!record.effectiveTo||record.effectiveTo>=day);
+}
+function airportFuelUSDPerGallon(a,day){
+ const record=getAirportFuelPrices()[a[0]];
+ if(!fuelPriceActive(record,day))return num('fuelPrice');
+ return Number(record.pricePerLiter)*(record.currency==='IDR'?1/Math.max(1,num('fx')):1)*3.785411784;
+}
+function fuelRouteCost(name,points,roundTrip,positioningHours){
+ const a=assumptions[name],outDate=date.value||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const cost=(route,day)=>route.slice(1).reduce((sum,p,i)=>sum+distanceBetween(route[i],p)/a.speed*a.burn*airportFuelUSDPerGallon(route[i],day),0);
+ let total=cost(points,outDate);
+ if(roundTrip)total+=cost([...points].reverse(),returnDate.value||outDate);
+ return total+positioningHours*a.burn*num('fuelPrice');
+}
+function fuelAdminMetadata(){
+ const scope=document.getElementById('fuelScope').value,currency=document.getElementById('fuelCurrency').value;
+ const effectiveFrom=document.getElementById('fuelEffectiveFrom').value,effectiveTo=document.getElementById('fuelEffectiveTo').value;
+ if(!effectiveFrom)throw Error('Select the effective start date from the supplier document.');
+ if(effectiveTo&&effectiveTo<effectiveFrom)throw Error('Effective until must not be before effective from.');
+ return {scope,currency,effectiveFrom,effectiveTo,product:'Jet A-1',source:document.getElementById('fuelSourceName').value.trim()};
+}
+function validateFuelAirport(a,scope){
+ if(!a)throw Error('Choose an airport from the directory.');
+ if(isIndonesianAirport(a)!==(scope==='ID'))throw Error('Airport does not match the selected Indonesia / International price list.');
+}
+async function persistAirportFuelPrices(next){
+ if(!window.TWAAdminVerified||!window.TWAFirebase)throw Error('Admin login required.');
+ await window.TWAFirebase.saveConfig('airportFuelPrices',next);
+ localStorage.setItem('twaAirportFuelPricesV1',JSON.stringify(next));drawAirportFuelPrices();calculateEstimate();
+}
+async function saveManualFuelPrice(){
+ const status=document.getElementById('fuelSavedStatus');
+ try{
+  const meta=fuelAdminMetadata(),a=airportMatch(document.getElementById('fuelAirport').value),price=Number(document.getElementById('fuelPriceLiter').value);
+  validateFuelAirport(a,meta.scope);if(!Number.isFinite(price)||price<=0)throw Error('Enter a positive price per liter.');
+  status.textContent='Saving airport fuel price…';
+  await persistAirportFuelPrices({...getAirportFuelPrices(),[a[0]]:{...meta,pricePerLiter:price,airport:a[0]}});
+  status.textContent='Airport fuel price saved to Firebase.';
+ }catch(e){status.textContent=e.message}
+}
+function drawAirportFuelPrices(){
+ const target=document.getElementById('airportFuelPricesAdmin');if(!target)return;
+ const entries=Object.entries(getAirportFuelPrices()).filter(([,r])=>r);
+ target.innerHTML='<table><thead><tr><th>Airport</th><th>Jet A-1 / liter</th><th>Effective dates</th><th>Source</th><th>Action</th></tr></thead><tbody>'+entries.map(([key,r],i)=>'<tr><td>'+esc(airportMatch(key)?.[2]||key)+' ('+esc(key)+')</td><td>'+esc(r.currency)+' '+esc(r.pricePerLiter)+'</td><td>'+esc(r.effectiveFrom)+' — '+esc(r.effectiveTo||'open')+'</td><td>'+esc(r.source)+'</td><td><button type="button" class="btn secondary" id="editFuel'+i+'">Edit</button> <button type="button" class="btn secondary" id="deleteFuel'+i+'">Delete</button></td></tr>').join('')+(entries.length?'':'<tr><td colspan="5">No airport fuel prices yet. Default fuel price applies.</td></tr>')+'</tbody></table>';
+ entries.forEach(([key,r],i)=>{
+  document.getElementById('editFuel'+i).onclick=()=>{document.getElementById('fuelScope').value=r.scope;document.getElementById('fuelCurrency').value=r.currency;document.getElementById('fuelSourceName').value=r.source||'';document.getElementById('fuelEffectiveFrom').value=r.effectiveFrom||'';document.getElementById('fuelEffectiveTo').value=r.effectiveTo||'';document.getElementById('fuelAirport').value=key;document.getElementById('fuelPriceLiter').value=r.pricePerLiter;document.getElementById('fuelAirport').scrollIntoView({behavior:'smooth',block:'center'})};
+  document.getElementById('deleteFuel'+i).onclick=async()=>{const status=document.getElementById('fuelSavedStatus');try{await persistAirportFuelPrices({...getAirportFuelPrices(),[key]:null});status.textContent='Airport fuel price deleted.'}catch(e){status.textContent=e.message}};
+ });
+}
+function parseSupplierNumber(raw){
+ let value=String(raw).trim().replace(/\s/g,'');
+ if(!/^\d[\d.,]*$/.test(value))return NaN;
+ if(value.includes(',')&&value.includes('.')){const decimal=value.lastIndexOf(',')>value.lastIndexOf('.')?',':'.';value=value.split(decimal==='.'?',':'.').join('').replace(decimal,'.')}
+ else if(/^\d{1,3}([.,]\d{3})+$/.test(value)){value=value.replace(/[.,]/g,'')}
+ else value=value.replace(',','.');
+ return Number(value);
+}
+function parseFuelCSV(text){
+ const rows=[];let row=[],cell='',quoted=false;
+ const delimiter=text.split(/\r?\n/)[0].includes(';')?';':',';
+ for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(cell);cell=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cell);if(row.some(v=>v.trim()))rows.push(row);row=[];cell=''}else cell+=ch}
+ if(quoted)throw Error('CSV contains an unclosed quoted field.');
+ row.push(cell);if(row.some(v=>v.trim()))rows.push(row);
+ if(!rows.length)return [];
+ const header=rows.shift().map(v=>v.replace(/^\uFEFF/,'').trim().toLowerCase()),ai=header.indexOf('airport'),ci=header.indexOf('currency'),pi=header.indexOf('priceperliter');
+ if(ai<0||pi<0)throw Error('CSV requires airport,currency,pricePerLiter columns.');
+ return rows.map(r=>({airport:(r[ai]||'').trim(),currency:ci>=0?(r[ci]||'').trim().toUpperCase():'',price:r[pi]||'',candidates:[],line:r.join(' | ')}));
+}
+async function readFuelPDF(file){
+ const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+ pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+ const pdf=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,lines=[];
+ try{
+  for(let pageNumber=1;pageNumber<=pdf.numPages;pageNumber++){
+   const page=await pdf.getPage(pageNumber),content=await page.getTextContent(),groups=[];
+   for(const item of content.items){if(!item.str?.trim())continue;const y=item.transform[5];let group=groups.find(g=>Math.abs(g.y-y)<3);if(!group){group={y,items:[]};groups.push(group)}group.items.push({x:item.transform[4],text:item.str})}
+   groups.sort((a,b)=>b.y-a.y).forEach(g=>lines.push(g.items.sort((a,b)=>a.x-b.x).map(x=>x.text).join(' ')));
+  }
+ }finally{await pdf.destroy()}
+ return lines.join('\n');
+}
+function detectFuelTextRows(text){
+ const normalize=s=>s.toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim(),rows=[];
+ for(const line of text.split(/\r?\n/)){
+  const upper=' '+normalize(line)+' ';
+  let matches=airportData.filter(a=>upper.includes(' '+a[0]+' ')||upper.includes(' '+a[1]+' '));
+  if(!matches.length)matches=airportData.filter(a=>upper.includes(' '+normalize(a[2])+' '));
+  if(matches.length!==1)continue;
+  const tokens=line.match(/\d[\d.,]*(?:\s?(?:IDR|USD))?/g)||[];
+  const candidates=[...new Set(tokens.map(t=>t.replace(/\s?(IDR|USD)$/,'')).filter(t=>Number.isFinite(parseSupplierNumber(t))&&parseSupplierNumber(t)>0))];
+  if(!candidates.length)continue;
+  rows.push({airport:matches[0][0],currency:/\bUSD\b/i.test(line)?'USD':/\bIDR\b|\bRp\b/i.test(line)?'IDR':'',price:'',candidates,line});
+ }
+ return rows;
+}
+let fuelImportRows=[];
+async function importFuelFile(input){
+ const file=input.files?.[0],status=document.getElementById('fuelImportStatus');fuelImportRows=[];document.getElementById('fuelImportPreview').replaceChildren();document.getElementById('fuelImportSave').disabled=true;if(!file)return;
+ if(file.size>15*1024*1024){status.textContent='Maximum file size is 15 MB.';return}
+ status.textContent='Reading supplier document…';
+ try{
+  const isPDF=/\.pdf$/i.test(file.name),text=isPDF?await readFuelPDF(file):await file.text();
+  document.getElementById('fuelImportText').value=text;
+  if(!text.trim())throw Error('No readable text. This may be a scanned PDF; use OCR, CSV or manual entry.');
+  fuelImportRows=/\.csv$/i.test(file.name)?parseFuelCSV(text):detectFuelTextRows(text);
+  if(!document.getElementById('fuelSourceName').value.trim())document.getElementById('fuelSourceName').value=file.name;
+  drawFuelImportPreview();
+  status.textContent=fuelImportRows.length?'Review '+fuelImportRows.length+' detected row(s). Select only the correct Jet A-1 rows and verify prices, currency, units and effective dates.':'No unambiguous airport rows found. Review extracted text and use manual entry or CSV.';
+ }catch(e){status.textContent='Import failed: '+e.message}
+}
+function drawFuelImportPreview(){
+ const target=document.getElementById('fuelImportPreview');
+ target.innerHTML='<table><thead><tr><th>Include</th><th>Airport</th><th>Currency</th><th>Price / liter</th><th>Document row / candidate values</th></tr></thead><tbody>'+fuelImportRows.map((r,i)=>'<tr><td><input type="checkbox" id="fuelInclude'+i+'" style="width:auto" aria-label="Include row '+(i+1)+'"></td><td><input id="fuelCode'+i+'" value="'+esc(r.airport)+'" style="min-width:80px" aria-label="Airport"></td><td><select id="fuelCCY'+i+'"><option '+((r.currency||document.getElementById('fuelCurrency').value)==='IDR'?'selected':'')+'>IDR</option><option '+(r.currency==='USD'||(!r.currency&&document.getElementById('fuelCurrency').value==='USD')?'selected':'')+'>USD</option></select></td><td><input type="number" min="0.000001" step="any" id="fuelValue'+i+'" aria-label="Price per liter" value="'+(Number.isFinite(parseSupplierNumber(r.price))?parseSupplierNumber(r.price):'')+'"></td><td><small>'+esc(r.line)+'</small>'+(r.candidates.length?'<select id="fuelCandidate'+i+'"><option value="">Choose price column…</option>'+r.candidates.map(v=>'<option value="'+esc(parseSupplierNumber(v))+'">'+esc(v)+'</option>').join('')+'</select>':'')+'</td></tr>').join('')+'</tbody></table>';
+ fuelImportRows.forEach((r,i)=>{const select=document.getElementById('fuelCandidate'+i);if(select)select.onchange=()=>{document.getElementById('fuelValue'+i).value=select.value}});
+ document.getElementById('fuelImportSave').disabled=!fuelImportRows.length;
+}
+async function saveImportedFuelPrices(){
+ const status=document.getElementById('fuelSavedStatus');
+ try{
+  const meta=fuelAdminMetadata(),next={...getAirportFuelPrices()},seen=new Set();let count=0;
+  fuelImportRows.forEach((r,i)=>{
+   if(!document.getElementById('fuelInclude'+i).checked)return;
+   const a=airportMatch(document.getElementById('fuelCode'+i).value),price=Number(document.getElementById('fuelValue'+i).value),currency=document.getElementById('fuelCCY'+i).value;
+   validateFuelAirport(a,meta.scope);if(!Number.isFinite(price)||price<=0)throw Error('Row '+(i+1)+': enter a positive price per liter.');
+   if(seen.has(a[0]))throw Error('Select only one price row per airport: '+a[0]);seen.add(a[0]);
+   next[a[0]]={...meta,airport:a[0],currency,pricePerLiter:price};count++;
+  });
+  if(!count)throw Error('Select the reviewed rows to import.');
+  status.textContent='Saving reviewed fuel prices…';await persistAirportFuelPrices(next);status.textContent=count+' airport fuel price(s) saved to Firebase.';
+ }catch(e){status.textContent=e.message}
+}
+
 function priceForAircraft(name){
  const a=assumptions[name],start=airportMatch(from.value),end=airportMatch(to.value);if(!a||!num('distance')||!start||!end||start===end)return null;
  const helicopter=name==='Bell 412EP'||name==='AW109S Grand';
@@ -389,7 +549,7 @@ function priceForAircraft(name){
  const legs=currentTrip==='Round Trip'?2:1,points=plan?plan.points:[start,end],nm=plan?plan.totalNM:num('distance'),hours=plan?plan.totalHours:nm/a.speed,totalHours=hours*legs+num('positioning'),sectors=(points.length-1)*legs;
  // Charge each visited airport once per journey direction, including fuel stops.
  const handling=plan?points.reduce((sum,p)=>sum+airportRate(p[0]),0)*legs:handlingTotal(legs);
- const items=[['Aircraft charter',totalHours*a.rate],['Fuel',totalHours*a.burn*num('fuelPrice')],['Ground handling',handling],['Landing fees',sectors*num('landing')],['Parking',num('parkingDays')*num('parking')],['Navigation',totalHours*num('navFee')],['Crew expenses',num('crewDays')*num('crew')],['Permits, catering & other',num('otherFees')]];
+ const items=[['Aircraft charter',totalHours*a.rate],['Fuel',fuelRouteCost(name,points,legs===2,num('positioning'))],['Ground handling',handling],['Landing fees',sectors*num('landing')],['Parking',num('parkingDays')*num('parking')],['Navigation',totalHours*num('navFee')],['Crew expenses',num('crewDays')*num('crew')],['Permits, catering & other',num('otherFees')]];
  const subtotal=items.reduce((v,x)=>v+x[1],0),service=subtotal*num('service')/100,tax=(subtotal+service)*num('tax')/100;items.push(['Service charge',service],['Tax (indicative)',tax]);return {items,total:subtotal+service+tax,hours,nm,legs,sectors,totalHours,plan,route:points.map(p=>p[0]).join(' → ')};
 }
 function formatPrice(usd){const c=document.getElementById('currency').value;return new Intl.NumberFormat(c==='IDR'?'id-ID':'en-US',{style:'currency',currency:c,maximumFractionDigits:0}).format(usd*(c==='IDR'?num('fx'):1))}
@@ -507,7 +667,7 @@ function showPriceDetails(index){
  if(!p){alert('Please enter a valid departure and destination airport to see price and route details.');return}
  const a=airportMatch(from.value),b=airportMatch(to.value),modal=document.getElementById('priceModal');
  document.getElementById('priceModalTitle').textContent=name+' · '+entry[2];
- document.getElementById('priceModalContent').innerHTML=`<h3>Flight route</h3><p><strong>${esc(a[2])} (${esc(a[0])}/${esc(a[1])}) → ${esc(b[2])} (${esc(b[0])}/${esc(b[1])})</strong></p><p class="small">${p.nm.toFixed(1)} NM ${p.plan?'via '+esc(p.route):'great-circle'} · ${timeLabel(p.hours)} airborne per direction · ${esc(date.value||'Date not set')} · ${esc(pax.value)} passengers</p><div class="route-map"><div id="realRouteMap"></div></div><div id="smartRouteDetails"></div><h3>Estimated price breakdown</h3>`+p.items.map(x=>`<div class="costrow"><span>${esc(x[0])}</span><strong>${formatPrice(x[1])}</strong></div>`).join('')+`<div class="modal-total">Estimated total: ${formatPrice(p.total)}</div><p class="small">Indicative price only; not a confirmed quotation. ${p.plan?'Proposed refuel sectors, their flight distance, fuel, ground handling and landing fees are included. Refuel ground time, overnight costs and additional permits require Operations confirmation.':'Additional stops, extra flight distance, overnight costs and permits require a revised Operations quotation.'}</p>`;
+ document.getElementById('priceModalContent').innerHTML=`<h3>Flight route</h3><p><strong>${esc(a[2])} (${esc(a[0])}/${esc(a[1])}) → ${esc(b[2])} (${esc(b[0])}/${esc(b[1])})</strong></p><p class="small">${p.nm.toFixed(1)} NM ${p.plan?'via '+esc(p.route):'great-circle'} · ${timeLabel(p.hours)} airborne per direction · ${esc(date.value||'Date not set')} · ${esc(pax.value)} passengers</p><div class="route-map"><div id="realRouteMap"></div></div><div id="smartRouteDetails"></div><h3>Estimated price breakdown</h3>`+p.items.map(x=>`<div class="costrow"><span>${esc(x[0])}</span><strong>${formatPrice(x[1])}</strong></div>`).join('')+`<div class="modal-total">Estimated total: ${formatPrice(p.total)}</div><p class="small">Fuel uses valid airport Jet A-1 prices per departure/refuel sector (IDR or USD per liter); missing or out-of-period airport prices use the default fuel rate. Positioning fuel uses the default rate. Indicative price only; not a confirmed quotation. ${p.plan?'Proposed refuel sectors, their flight distance, fuel, ground handling and landing fees are included. Refuel ground time, overnight costs and additional permits require Operations confirmation.':'Additional stops, extra flight distance, overnight costs and permits require a revised Operations quotation.'}</p>`;
  document.getElementById('modalBookButton').onclick=()=>{closePriceDetails();choose(name)};
  modal.classList.remove('hidden');
  initializeRouteMap(a,b,name);
@@ -541,7 +701,7 @@ function airportRate(raw){const a=typeof airportMatch==='function'?airportMatch(
 function handlingTotal(legs){return airportRate(from.value)+airportRate(to.value)+(legs===2?airportRate(to.value):0)}
 async function adminSignIn(){if(!window.TWAFirebase){adminError.textContent='Firebase is still loading or unavailable. Open the site using HTTPS and check your connection.';return}try{await window.TWAFirebase.adminLogin(adminUser.value.trim(),adminPass.value);adminPass.value='';adminError.textContent='';syncAdminView()}catch(e){adminError.textContent='Firebase login failed: '+(e.code||e.message)}}
 async function adminSignOut(){if(window.TWAFirebase)await window.TWAFirebase.adminLogout();adminPass.value='';syncAdminView()}
-function syncAdminView(){const ok=!!window.TWAAdminVerified;adminGate.classList.toggle('hidden',ok);adminWorkspace.classList.toggle('hidden',!ok);if(ok){drawAdminCosts();drawFleetPhotoAdmin();drawHelicopterRoutesAdmin();render()}}
+function syncAdminView(){const ok=!!window.TWAAdminVerified;adminGate.classList.toggle('hidden',ok);adminWorkspace.classList.toggle('hidden',!ok);if(ok){drawAdminCosts();drawFleetPhotoAdmin();drawHelicopterRoutesAdmin();drawAirportFuelPrices();render()}}
 let adminPricingCurrency=readCostConfig().adminCurrency==='IDR'?'IDR':'USD';
 const nonMoneyFields=new Set(['parkingDays','crewDays','positioning','service','tax']);
 const US_GAL_TO_LITER=3.785411784;
@@ -683,6 +843,7 @@ const reportError=e=>{console.error('Transwisata Firebase:',e);};
 function refreshLocalPublic(data){
  try{
   if(data.helicopterRoutes){localStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(data.helicopterRoutes));window.drawHelicopterRoutesAdmin?.();window.calculateEstimate?.();}
+  if(data.airportFuelPrices){localStorage.setItem('twaAirportFuelPricesV1',JSON.stringify(data.airportFuelPrices));window.drawAirportFuelPrices?.();window.calculateEstimate?.();}
   if(data.costs){localStorage.setItem('twaCostConfig',JSON.stringify(data.costs));window.applyCostConfig?.();}
   if(data.fleetSpecs){localStorage.setItem('twaFleetSpecsV1',JSON.stringify(data.fleetSpecs));window.renderFleetPrices?.();window.drawFleetSpecsAdmin?.();}
   if(data.photos){localStorage.setItem('twaFleetPhotosV1',JSON.stringify(data.photos));window.applyFleetPhotos?.();window.drawFleetPhotoAdmin?.();}
