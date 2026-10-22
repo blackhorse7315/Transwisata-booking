@@ -19,6 +19,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Use workflow publishing as the only Pages source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow --silent
       - name: Configure public Pages site
         uses: actions/configure-pages@v5
         with:
@@ -34,3 +38,29 @@ jobs:
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify published logo and install icons
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python - <<'PY'
+          import io, os, time, urllib.request
+          from PIL import Image
+          base = os.environ['SITE_URL'].rstrip('/') + '/'
+          for name, size in [('assets/logo.png', None), ('assets/icon-192.png', (192,192)), ('assets/icon-512.png', (512,512)), ('assets/apple-touch-icon.png', (180,180))]:
+              for attempt in range(6):
+                  try:
+                      url = base + name + '?build=' + os.environ['GITHUB_SHA']
+                      with urllib.request.urlopen(url, timeout=20) as response:
+                          data = response.read()
+                      with Image.open(io.BytesIO(data)) as image:
+                          image.verify()
+                      with Image.open(io.BytesIO(data)) as image:
+                          if size and image.size != size:
+                              raise ValueError('Incorrect icon size')
+                      print('Verified published image:', name)
+                      break
+                  except Exception:
+                      if attempt == 5:
+                          raise
+                      time.sleep(5)
+          PY
