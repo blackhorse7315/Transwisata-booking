@@ -22,7 +22,7 @@ function validateConfig(input){
  const names=new Set(),regs=new Set();
  out.fleet=input.fleet.map(row=>{
   const r={name:String(row.name||'').trim(),description:String(row.description||'').trim(),registration:String(row.registration||'').trim().toUpperCase(),type:row.type,active:row.active!==false};
-  if(!r.name||r.name.length>80||!r.name.match(/^[\p{L}\p{N} ._()+\/-]+$/u)||r.description.length>250||!r.registration.match(/^[A-Z0-9][A-Z0-9-]{1,19}$/)||r.name==='To be advised'||names.has(r.name.toLowerCase())||regs.has(r.registration)||!['helicopter','fixed'].includes(r.type))throw Error('Nama/registrasi pesawat harus unik dan valid.');
+  if(!r.name||r.name.length>80||!r.name.match(/^[\p{L}\p{N} ._()+\/-]+$/u)||r.description.length>250||!r.registration.match(/^[A-Z0-9][A-Z0-9-]{1,19}$/)||r.name==='To be advised'||['__proto__','constructor','prototype'].includes(r.name.toLowerCase())||names.has(r.name.toLowerCase())||regs.has(r.registration)||!['helicopter','fixed'].includes(r.type))throw Error('Nama/registrasi pesawat harus unik dan valid.');
   names.add(r.name.toLowerCase());regs.add(r.registration);
   for(const key of ['planningSpeed','rateUSD','burnLiters','cruiseSpeed','endurance','seats','range','dailyHours','maxLegMinutes']){
    r[key]=Number(row[key]);if(!Number.isFinite(r[key])||r[key]<0||r[key]>10000000)throw Error('Angka pesawat tidak valid: '+r.name+' / '+key);
@@ -85,9 +85,9 @@ window.applyCompanyCustomization=function(input,options={}){
  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',config.primary);
  let style=el('companyTheme');if(!style){style=document.createElement('style');style.id='companyTheme';document.head.append(style)}
  style.textContent='body{background:'+config.background+'!important;color:'+config.text+'}header,footer{background:'+config.primary+'!important}.hero{background:linear-gradient(110deg,'+config.primary+','+config.primary+'d9)!important}.btn:not(.secondary){background:'+config.accent+'!important}.tabs button.active{background:'+config.primary+'!important}.hero>div>span{color:'+config.accent+'!important}#fleet .fleet-detail{background:'+config.primary+'!important}#fleet .fleet-price{color:'+config.primary+'!important}.summary-strip.premium-route{background:'+config.primary+'!important}';
- if(config.logoData)el('appBrandLogo').src=config.logoData;
+ el('appBrandLogo').src=config.logoData||new URL('assets/logo.png',location.href).href;
  const icon=config.iconData||config.logoData;
- if(icon){document.querySelector('link[rel="icon"]').href=icon;document.querySelector('link[rel="apple-touch-icon"]').href=icon}
+ document.querySelector('link[rel="icon"]').href=icon||new URL('assets/icon-192.png',location.href).href;document.querySelector('link[rel="apple-touch-icon"]').href=icon||new URL('assets/apple-touch-icon.png',location.href).href;
  applyFleet(config,!!options.preview);
  if(!options.preview)refreshCompanyInstallManifest(config);
  const status=el('saConnection');if(status)status.textContent='Project aktif: '+(window.TWA_BOOTSTRAP?.firebase?.projectId||'default');
@@ -99,7 +99,7 @@ const section=document.createElement('section');section.id='superAdmin';section.
 const superNav=document.createElement('button');superNav.type='button';superNav.textContent='Super Admin';superNav.onclick=()=>showPage('superAdmin');document.querySelector('header nav').append(superNav);
 window.syncSuperAdminView=function(){
  const ok=!!window.TWASuperAdminVerified;el('saGate').classList.toggle('hidden',ok);el('saWorkspace').classList.toggle('hidden',!ok);
- if(ok)fillForm(liveConfig);
+ if(ok)fillForm(liveConfig,true);
 };
 window.superAdminLogin=async function(){
  try{
@@ -108,9 +108,9 @@ window.superAdminLogin=async function(){
   await window.TWAFirebase.adminLogin(email,password);await window.TWAFirebase.verifySuperAdmin();syncSuperAdminView();message('Super Admin terverifikasi.');
  }catch(e){message('Akses Super Admin gagal: '+(e.code||e.message)+'. Pastikan UID dan Firestore Rules sudah sesuai.')}
 };
-function fillForm(config){
+function fillForm(config,hydrate=false){
  for(const key of [...Object.keys(textFields),...Object.keys(colorFields)])el('sa_'+key).value=config[key];
- draftFleet=clone(config.fleet);logoDraft=config.logoData||'';iconDraft=config.iconData||'';drawFleetRows();drawImages();
+ draftFleet=clone(config.fleet);if(hydrate){const specs=fleetSpecs();for(const row of draftFleet){const rates=assumptions[row.name],spec=specs[row.name];if(rates){row.rateUSD=rates.rate;row.burnLiters=rates.burn*3.785411784}if(spec){row.cruiseSpeed=spec.speed;row.endurance=spec.endurance;row.seats=spec.seats;row.range=spec.range}}}logoDraft=config.logoData||'';iconDraft=config.iconData||'';drawFleetRows();drawImages();
  const bootstrap=window.TWA_BOOTSTRAP||{};
  for(const key of firebaseKeys)el('sa_fb_'+key).value=bootstrap.firebase?.[key]||'';
  el('saSuperUid').value=bootstrap.superAdminUid||'';el('saAdminUids').value=(bootstrap.adminUids||[]).join(',');
