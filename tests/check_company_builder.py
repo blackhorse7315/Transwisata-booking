@@ -34,10 +34,13 @@ try:
             let injectionBlocked=false;try{validateCompanyConfig({...cfg,fleet:[{...cfg.fleet[0],name:'<img src=x>'}]})}catch{injectionBlocked=true}
             checks.injectionBlocked=injectionBlocked;
             if(Object.values(checks).some(v=>!v))throw Error(JSON.stringify(checks));
+            applyCompanyCustomization(valid);
             window.TWASuperAdminVerified=true;syncSuperAdminView();
             return checks;
         }""")
         print("COMPANY_EDITOR_CHECKS",json.dumps(result))
+        page.wait_for_function("""async()=>{const link=document.querySelector('link[rel="manifest"]');if(!link.href.includes('company='))return false;const response=await fetch(link.href);const manifest=await response.json();return manifest.name==='Demo Air Charter'&&manifest.icons.length===3&&manifest.icons.every(i=>i.src.startsWith('data:image/png;base64,'))}""",timeout=30000)
+        print("PWA_MANIFEST_CHECKS passed")
         with page.expect_download(timeout=90000) as download_info:
             page.evaluate("exportCompanyApp()")
         downloaded=download_info.value
