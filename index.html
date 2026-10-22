@@ -149,10 +149,16 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
 </div>
 <div class="costgrid"><div><label for="fuelAirport">Airport / location</label><input id="fuelAirport" placeholder="City / IATA / ICAO" autocomplete="off" aria-autocomplete="list"></div>
 <div><label for="fuelPriceLiter">Jet A-1 / Avtur price per liter</label><input id="fuelPriceLiter" type="number" min="0.000001" step="any" placeholder="e.g. 17500 or 1.25"></div></div>
+<div class="costgrid" id="pertaminaThreePrices">
+<div><label for="fuelInternational">International Flight Price (US cents / liter)</label><input id="fuelInternational" type="number" min="0.000001" step="any" placeholder="e.g. 85.25"></div>
+<div><label for="fuelDomestic">Domestic · into / not into plane (Rp / liter, incl. VAT + Gov Tax)</label><input id="fuelDomestic" type="number" min="0.000001" step="any" placeholder="e.g. 17500"></div>
+<div><label for="fuelDomesticMulti">Domestic · one time multi customer (Rp / liter, incl. VAT + Gov Tax)</label><input id="fuelDomesticMulti" type="number" min="0.000001" step="any" placeholder="e.g. 17800"></div>
+<div><label for="fuelDomesticTier">Domestic tariff used in estimates</label><select id="fuelDomesticTier"><option value="standard">Domestic · into / not into plane</option><option value="multi">Domestic · one time multi customer</option></select></div>
+</div><p class="small">For Indonesia, the three Pertamina columns above are stored together. International US cents are divided by 100 to obtain USD per liter. Domestic estimates use the chosen domestic tariff; international routes use the international tariff at Indonesian airports. The single-price field is used for foreign airports and legacy records.</p>
 <div class="actions"><button type="button" class="btn" onclick="saveManualFuelPrice()">Save Airport Fuel Price</button></div>
 <label for="fuelImportFile" style="margin-top:20px">Import supplier price list (PDF / CSV / TXT · max 15 MB)</label>
 <input id="fuelImportFile" type="file" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" onchange="importFuelFile(this)">
-<p class="small">CSV columns: airport,currency,pricePerLiter — e.g. HLP,IDR,17500. Set the effective dates above. PDF text extraction may include several price columns; choose the appropriate Jet A-1 price explicitly. Scanned PDFs require OCR or manual input.</p>
+<p class="small">Pertamina CSV columns: airport,internationalUSCentsPerLiter,domesticIDRPerLiter,domesticMultiIDRPerLiter. International CSV: airport,currency,pricePerLiter. Set the effective dates above. PDF import detects the three Pertamina price columns by header position when available; blank or ambiguous values must be entered manually. Scanned PDFs require OCR or manual input.</p>
 <p id="fuelImportStatus" class="small" role="status" aria-live="polite"></p>
 <details><summary>Extracted document text</summary><textarea id="fuelImportText" readonly style="height:180px"></textarea></details>
 <div id="fuelImportPreview" style="overflow:auto"></div>
@@ -443,14 +449,19 @@ function fuelPriceActive(record,day){
  &&['IDR','USD'].includes(record.currency)&&!!record.effectiveFrom
  &&record.effectiveFrom<=day&&(!record.effectiveTo||record.effectiveTo>=day);
 }
-function airportFuelUSDPerGallon(a,day){
+function airportFuelUSDPerGallon(a,day,internationalFlight=false){
  const record=getAirportFuelPrices()[a[0]];
  if(!fuelPriceActive(record,day))return num('fuelPrice');
- return Number(record.pricePerLiter)*(record.currency==='IDR'?1/Math.max(1,num('fx')):1)*3.785411784;
+ const factor=3.785411784,fx=Math.max(1,num('fx'));
+ if(isIndonesianAirport(a)&&Number(record.internationalUSCentsPerLiter)>0){
+  const price=internationalFlight?Number(record.internationalUSCentsPerLiter)/100:Number(record.domesticTier==='multi'?record.domesticMultiIDRPerLiter:record.domesticIDRPerLiter)/fx;
+  return Number.isFinite(price)&&price>0?price*factor:num('fuelPrice');
+ }
+ return Number(record.pricePerLiter)*(record.currency==='IDR'?1/fx:1)*factor;
 }
 function fuelRouteCost(name,points,roundTrip,positioningHours){
  const a=assumptions[name],outDate=date.value||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- const cost=(route,day)=>route.slice(1).reduce((sum,p,i)=>sum+distanceBetween(route[i],p)/a.speed*a.burn*airportFuelUSDPerGallon(route[i],day),0);
+ const cost=(route,day)=>route.slice(1).reduce((sum,p,i)=>sum+distanceBetween(route[i],p)/a.speed*a.burn*airportFuelUSDPerGallon(route[i],day,points.some(p=>!isIndonesianAirport(p))),0);
  let total=cost(points,outDate);
  if(roundTrip)total+=cost([...points].reverse(),returnDate.value||outDate);
  return total+positioningHours*a.burn*num('fuelPrice');
@@ -471,22 +482,29 @@ async function persistAirportFuelPrices(next){
  await window.TWAFirebase.saveConfig('airportFuelPrices',next);
  localStorage.setItem('twaAirportFuelPricesV1',JSON.stringify(next));drawAirportFuelPrices();calculateEstimate();
 }
+
+function pertaminaRecord(meta,airport,international,domestic,multi,tier){
+ const values=[international,domestic,multi].map(Number);
+ if(values.some(v=>!Number.isFinite(v)||v<=0))throw Error('Enter all three positive Pertamina prices for '+airport+'.');
+ return {...meta,airport,internationalUSCentsPerLiter:values[0],domesticIDRPerLiter:values[1],domesticMultiIDRPerLiter:values[2],domesticTier:tier==='multi'?'multi':'standard',currency:'IDR',pricePerLiter:tier==='multi'?values[2]:values[1]};
+}
+
 async function saveManualFuelPrice(){
  const status=document.getElementById('fuelSavedStatus');
- try{
-  const meta=fuelAdminMetadata(),a=airportMatch(document.getElementById('fuelAirport').value),price=Number(document.getElementById('fuelPriceLiter').value);
-  validateFuelAirport(a,meta.scope);if(!Number.isFinite(price)||price<=0)throw Error('Enter a positive price per liter.');
-  status.textContent='Saving airport fuel price…';
-  await persistAirportFuelPrices({...getAirportFuelPrices(),[a[0]]:{...meta,pricePerLiter:price,airport:a[0]}});
-  status.textContent='Airport fuel price saved to Firebase.';
- }catch(e){status.textContent=e.message}
+ return (async()=>{try{
+  const meta=fuelAdminMetadata(),a=airportMatch(document.getElementById('fuelAirport').value);
+  validateFuelAirport(a,meta.scope);let record;
+  if(meta.scope==='ID'){record=pertaminaRecord(meta,a[0],document.getElementById('fuelInternational').value,document.getElementById('fuelDomestic').value,document.getElementById('fuelDomesticMulti').value,document.getElementById('fuelDomesticTier').value)}
+  else {const price=Number(document.getElementById('fuelPriceLiter').value);if(!Number.isFinite(price)||price<=0)throw Error('Enter a positive price per liter.');record={...meta,pricePerLiter:price,airport:a[0]}}
+  status.textContent='Saving airport fuel price…';await persistAirportFuelPrices({...getAirportFuelPrices(),[a[0]]:record});status.textContent='Airport fuel prices saved to Firebase.';
+ }catch(e){status.textContent=e.message}})();
 }
 function drawAirportFuelPrices(){
  const target=document.getElementById('airportFuelPricesAdmin');if(!target)return;
  const entries=Object.entries(getAirportFuelPrices()).filter(([,r])=>r);
- target.innerHTML='<table><thead><tr><th>Airport</th><th>Jet A-1 / liter</th><th>Effective dates</th><th>Source</th><th>Action</th></tr></thead><tbody>'+entries.map(([key,r],i)=>'<tr><td>'+esc(airportMatch(key)?.[2]||key)+' ('+esc(key)+')</td><td>'+esc(r.currency)+' '+esc(r.pricePerLiter)+'</td><td>'+esc(r.effectiveFrom)+' — '+esc(r.effectiveTo||'open')+'</td><td>'+esc(r.source)+'</td><td><button type="button" class="btn secondary" id="editFuel'+i+'">Edit</button> <button type="button" class="btn secondary" id="deleteFuel'+i+'">Delete</button></td></tr>').join('')+(entries.length?'':'<tr><td colspan="5">No airport fuel prices yet. Default fuel price applies.</td></tr>')+'</tbody></table>';
+ target.innerHTML='<table><thead><tr><th>Airport</th><th>Jet A-1 / liter</th><th>International (US cents/L)</th><th>Domestic (Rp/L)</th><th>Domestic Multi (Rp/L)</th><th>Effective dates</th><th>Source</th><th>Action</th></tr></thead><tbody>'+entries.map(([key,r],i)=>'<tr><td>'+esc(airportMatch(key)?.[2]||key)+' ('+esc(key)+')</td><td>'+esc(r.currency)+' '+esc(r.pricePerLiter)+'</td><td>'+esc(r.internationalUSCentsPerLiter||'—')+'</td><td>'+esc(r.domesticIDRPerLiter||'—')+'</td><td>'+esc(r.domesticMultiIDRPerLiter||'—')+'</td><td>'+esc(r.effectiveFrom)+' — '+esc(r.effectiveTo||'open')+'</td><td>'+esc(r.source)+'</td><td><button type="button" class="btn secondary" id="editFuel'+i+'">Edit</button> <button type="button" class="btn secondary" id="deleteFuel'+i+'">Delete</button></td></tr>').join('')+(entries.length?'':'<tr><td colspan="8">No airport fuel prices yet. Default fuel price applies.</td></tr>')+'</tbody></table>';
  entries.forEach(([key,r],i)=>{
-  document.getElementById('editFuel'+i).onclick=()=>{document.getElementById('fuelScope').value=r.scope;document.getElementById('fuelCurrency').value=r.currency;document.getElementById('fuelSourceName').value=r.source||'';document.getElementById('fuelEffectiveFrom').value=r.effectiveFrom||'';document.getElementById('fuelEffectiveTo').value=r.effectiveTo||'';document.getElementById('fuelAirport').value=key;document.getElementById('fuelPriceLiter').value=r.pricePerLiter;document.getElementById('fuelAirport').scrollIntoView({behavior:'smooth',block:'center'})};
+  document.getElementById('editFuel'+i).onclick=()=>{document.getElementById('fuelScope').value=r.scope;document.getElementById('fuelCurrency').value=r.currency;document.getElementById('fuelSourceName').value=r.source||'';document.getElementById('fuelEffectiveFrom').value=r.effectiveFrom||'';document.getElementById('fuelEffectiveTo').value=r.effectiveTo||'';document.getElementById('fuelAirport').value=key;document.getElementById('fuelPriceLiter').value=r.pricePerLiter;document.getElementById('fuelInternational').value=r.internationalUSCentsPerLiter||'';document.getElementById('fuelDomestic').value=r.domesticIDRPerLiter||'';document.getElementById('fuelDomesticMulti').value=r.domesticMultiIDRPerLiter||'';document.getElementById('fuelDomesticTier').value=r.domesticTier||'standard';document.getElementById('fuelAirport').scrollIntoView({behavior:'smooth',block:'center'})};
   document.getElementById('deleteFuel'+i).onclick=async()=>{const status=document.getElementById('fuelSavedStatus');try{await persistAirportFuelPrices({...getAirportFuelPrices(),[key]:null});status.textContent='Airport fuel price deleted.'}catch(e){status.textContent=e.message}};
  });
 }
@@ -506,18 +524,20 @@ function parseFuelCSV(text){
  row.push(cell);if(row.some(v=>v.trim()))rows.push(row);
  if(!rows.length)return [];
  const header=rows.shift().map(v=>v.replace(/^\uFEFF/,'').trim().toLowerCase()),ai=header.indexOf('airport'),ci=header.indexOf('currency'),pi=header.indexOf('priceperliter');
- if(ai<0||pi<0)throw Error('CSV requires airport,currency,pricePerLiter columns.');
- return rows.map(r=>({airport:(r[ai]||'').trim(),currency:ci>=0?(r[ci]||'').trim().toUpperCase():'',price:r[pi]||'',candidates:[],line:r.join(' | ')}));
+ const ii=header.indexOf('internationaluscentsperliter'),di=header.indexOf('domesticidrperliter'),mi=header.indexOf('domesticmultiidrperliter');
+ if(ai<0||(pi<0&&(ii<0||di<0||mi<0)))throw Error('CSV requires airport,currency,pricePerLiter OR airport,internationalUSCentsPerLiter,domesticIDRPerLiter,domesticMultiIDRPerLiter.');
+ return rows.map(r=>({airport:(r[ai]||'').trim(),currency:ci>=0?(r[ci]||'').trim().toUpperCase():'',price:r[pi]||'',international:ii>=0?parseSupplierNumber(r[ii]):'',domestic:di>=0?parseSupplierNumber(r[di]):'',multi:mi>=0?parseSupplierNumber(r[mi]):'',candidates:[],line:r.join(' | ')}));
 }
 async function readFuelPDF(file){
  const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
  pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+ fuelPDFLayout=[];
  const pdf=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,lines=[];
  try{
   for(let pageNumber=1;pageNumber<=pdf.numPages;pageNumber++){
    const page=await pdf.getPage(pageNumber),content=await page.getTextContent(),groups=[];
-   for(const item of content.items){if(!item.str?.trim())continue;const y=item.transform[5];let group=groups.find(g=>Math.abs(g.y-y)<3);if(!group){group={y,items:[]};groups.push(group)}group.items.push({x:item.transform[4],text:item.str})}
-   groups.sort((a,b)=>b.y-a.y).forEach(g=>lines.push(g.items.sort((a,b)=>a.x-b.x).map(x=>x.text).join(' ')));
+   for(const item of content.items){if(!item.str?.trim())continue;const y=item.transform[5];let group=groups.find(g=>Math.abs(g.y-y)<3);if(!group){group={y,items:[]};groups.push(group)}group.items.push({x:item.transform[4],center:item.transform[4]+(item.width||0)/2,text:item.str})}
+   groups.sort((a,b)=>b.y-a.y).forEach(g=>{const items=g.items.sort((a,b)=>a.x-b.x),text=items.map(x=>x.text).join(' ');lines.push(text);fuelPDFLayout.push({page:pageNumber,items,text})});
   }
  }finally{await pdf.destroy()}
  return lines.join('\n');
@@ -528,6 +548,8 @@ function detectFuelTextRows(text){
   const upper=' '+normalize(line)+' ';
   let matches=airportData.filter(a=>upper.includes(' '+a[0]+' ')||upper.includes(' '+a[1]+' '));
   if(!matches.length)matches=airportData.filter(a=>upper.includes(' '+normalize(a[2])+' '));
+  const pertaminaAirportAliases={HLP:['HALIM','HALIM PERDANAKUSUMA'],CGK:['SOEKARNO HATTA','CENGKARENG'],DPS:['NGURAH RAI'],SUB:['JUANDA'],SRG:['AHMAD YANI'],PKU:['SULTAN SYARIF KASIM'],DJB:['SULTAN THAHA'],PLM:['SULTAN MAHMUD BADARUDDIN'],TKG:['RADIN INTEN'],TJQ:['H A S HANANDJOEDDIN','TANJUNG PANDAN'],PNK:['SUPADIO'],BPN:['SEPINGGAN','SULTAN AJI MUHAMMAD SULAIMAN'],UPG:['SULTAN HASANUDDIN'],MDC:['SAM RATULANGI'],SOC:['ADI SOEMARMO'],JOG:['ADISUTJIPTO'],YIA:['YOGYAKARTA INTERNATIONAL'],KNO:['KUALANAMU','KUALA NAMU'],BDO:['HUSEIN SASTRANEGARA'],LOP:['ZAINUDDIN ABDUL MADJID'],KOE:['EL TARI'],DJJ:['SENTANI'],AMQ:['PATTIMURA'],PDG:['MINANGKABAU'],PGK:['DEPATI AMIR']};
+  if(!matches.length){const codes=Object.entries(pertaminaAirportAliases).filter(([,aliases])=>aliases.some(name=>upper.includes(' '+name+' '))).map(([code])=>code);matches=airportData.filter(a=>codes.includes(a[0]))}
   if(matches.length!==1)continue;
   const tokens=line.match(/\d[\d.,]*(?:\s?(?:IDR|USD))?/g)||[];
   const candidates=[...new Set(tokens.map(t=>t.replace(/\s?(IDR|USD)$/,'')).filter(t=>Number.isFinite(parseSupplierNumber(t))&&parseSupplierNumber(t)>0))];
@@ -536,6 +558,33 @@ function detectFuelTextRows(text){
  }
  return rows;
 }
+
+let fuelPDFLayout=[];
+function fillPertaminaColumns(rows,layout){
+ const pages=[...new Set(layout.map(r=>r.page))];
+ for(const page of pages){
+  const pageRows=layout.filter(r=>r.page===page),items=pageRows.flatMap(r=>r.items);
+  const unique=xs=>xs.sort((a,b)=>a-b).filter((x,i,arr)=>i===0||x-arr[i-1]>20);
+  const international=unique(items.filter(x=>/\bINTERNATIONAL\b/i.test(x.text)).map(x=>x.center));
+  const domestic=unique(items.filter(x=>/\bDOMESTIC\b/i.test(x.text)).map(x=>x.center));
+  if(international.length!==1||domestic.length!==2||international[0]>=domestic[0])continue;
+  const centers=[international[0],...domestic];
+  for(const row of rows){
+   const line=pageRows.find(r=>r.text===row.line);if(!line)continue;
+   const cols=[[],[],[]];
+   for(const item of line.items){
+    const raw=item.text.trim();if(!/^\d[\d.,]*$/.test(raw))continue;
+    const value=parseSupplierNumber(raw);if(!Number.isFinite(value)||value<=0)continue;
+    let index=centers.reduce((best,x,i)=>Math.abs(item.center-x)<Math.abs(item.center-centers[best])?i:best,0);
+    if(item.center<centers[0]-(centers[1]-centers[0])/2||item.center>centers[2]+(centers[2]-centers[1])/2)continue;
+    cols[index].push(value);
+   }
+   if(cols.every(values=>values.length===1)){row.international=cols[0][0];row.domestic=cols[1][0];row.multi=cols[2][0];row.threeColumnDetected=true;}
+  }
+ }
+ return rows;
+}
+
 let fuelImportRows=[];
 async function importFuelFile(input){
  const file=input.files?.[0],status=document.getElementById('fuelImportStatus');fuelImportRows=[];document.getElementById('fuelImportPreview').replaceChildren();document.getElementById('fuelImportSave').disabled=true;if(!file)return;
@@ -546,31 +595,40 @@ async function importFuelFile(input){
   document.getElementById('fuelImportText').value=text;
   if(!text.trim())throw Error('No readable text. This may be a scanned PDF; use OCR, CSV or manual entry.');
   fuelImportRows=/\.csv$/i.test(file.name)?parseFuelCSV(text):detectFuelTextRows(text);
+  if(isPDF&&document.getElementById('fuelScope').value==='ID')fillPertaminaColumns(fuelImportRows,fuelPDFLayout);
   if(!document.getElementById('fuelSourceName').value.trim())document.getElementById('fuelSourceName').value=file.name;
   drawFuelImportPreview();
   status.textContent=fuelImportRows.length?'Review '+fuelImportRows.length+' detected row(s). Select only the correct Jet A-1 rows and verify prices, currency, units and effective dates.':'No unambiguous airport rows found. Review extracted text and use manual entry or CSV.';
  }catch(e){status.textContent='Import failed: '+e.message}
 }
 function drawFuelImportPreview(){
- const target=document.getElementById('fuelImportPreview');
- target.innerHTML='<table><thead><tr><th>Include</th><th>Airport</th><th>Currency</th><th>Price / liter</th><th>Document row / candidate values</th></tr></thead><tbody>'+fuelImportRows.map((r,i)=>'<tr><td><input type="checkbox" id="fuelInclude'+i+'" style="width:auto" aria-label="Include row '+(i+1)+'"></td><td><input id="fuelCode'+i+'" value="'+esc(r.airport)+'" style="min-width:80px" aria-label="Airport"></td><td><select id="fuelCCY'+i+'"><option '+((r.currency||document.getElementById('fuelCurrency').value)==='IDR'?'selected':'')+'>IDR</option><option '+(r.currency==='USD'||(!r.currency&&document.getElementById('fuelCurrency').value==='USD')?'selected':'')+'>USD</option></select></td><td><input type="number" min="0.000001" step="any" id="fuelValue'+i+'" aria-label="Price per liter" value="'+(Number.isFinite(parseSupplierNumber(r.price))?parseSupplierNumber(r.price):'')+'"></td><td><small>'+esc(r.line)+'</small>'+(r.candidates.length?'<select id="fuelCandidate'+i+'"><option value="">Choose price column…</option>'+r.candidates.map(v=>'<option value="'+esc(parseSupplierNumber(v))+'">'+esc(v)+'</option>').join('')+'</select>':'')+'</td></tr>').join('')+'</tbody></table>';
- fuelImportRows.forEach((r,i)=>{const select=document.getElementById('fuelCandidate'+i);if(select)select.onchange=()=>{document.getElementById('fuelValue'+i).value=select.value}});
+ const target=document.getElementById('fuelImportPreview'),indonesia=document.getElementById('fuelScope').value==='ID';
+ const input=(id,value,label)=>'<input type="number" min="0.000001" step="any" id="'+id+'" aria-label="'+label+'" value="'+(Number.isFinite(Number(value))&&Number(value)>0?value:'')+'" style="min-width:115px">';
+ target.innerHTML='<table><thead><tr><th>Include</th><th>Airport</th>'+(indonesia?'<th>International (US cents/L)</th><th>Domestic (Rp/L)</th><th>Domestic Multi (Rp/L)</th>':'<th>Currency</th><th>Price / liter</th>')+'<th>Document row</th></tr></thead><tbody>'+fuelImportRows.map((r,i)=>'<tr><td><input type="checkbox" id="fuelInclude'+i+'" style="width:auto" aria-label="Include row '+(i+1)+'"></td><td><input id="fuelCode'+i+'" value="'+esc(r.airport)+'" style="min-width:80px" aria-label="Airport"></td>'+(indonesia?'<td>'+input('fuelIntl'+i,r.international,'International US cents per liter')+'</td><td>'+input('fuelDom'+i,r.domestic,'Domestic IDR per liter')+'</td><td>'+input('fuelMulti'+i,r.multi,'Domestic multi customer IDR per liter')+'</td>':'<td><select id="fuelCCY'+i+'"><option '+((r.currency||document.getElementById('fuelCurrency').value)==='IDR'?'selected':'')+'>IDR</option><option '+((r.currency||document.getElementById('fuelCurrency').value)==='USD'?'selected':'')+'>USD</option></select></td><td>'+input('fuelValue'+i,parseSupplierNumber(r.price),'Price per liter')+'</td>')+'<td><small>'+esc(r.line)+(r.threeColumnDetected?' · 3 columns detected':'')+'</small></td></tr>').join('')+'</tbody></table>';
  document.getElementById('fuelImportSave').disabled=!fuelImportRows.length;
 }
 async function saveImportedFuelPrices(){
  const status=document.getElementById('fuelSavedStatus');
- try{
+ return (async()=>{try{
   const meta=fuelAdminMetadata(),next={...getAirportFuelPrices()},seen=new Set();let count=0;
   fuelImportRows.forEach((r,i)=>{
    if(!document.getElementById('fuelInclude'+i).checked)return;
-   const a=airportMatch(document.getElementById('fuelCode'+i).value),price=Number(document.getElementById('fuelValue'+i).value),currency=document.getElementById('fuelCCY'+i).value;
-   validateFuelAirport(a,meta.scope);if(!Number.isFinite(price)||price<=0)throw Error('Row '+(i+1)+': enter a positive price per liter.');
-   if(seen.has(a[0]))throw Error('Select only one price row per airport: '+a[0]);seen.add(a[0]);
-   next[a[0]]={...meta,airport:a[0],currency,pricePerLiter:price};count++;
+   const a=airportMatch(document.getElementById('fuelCode'+i).value);validateFuelAirport(a,meta.scope);
+   if(seen.has(a[0]))throw Error('Select only one price row per airport: '+a[0]);seen.add(a[0]);let record;
+   if(meta.scope==='ID'){
+    if(!document.getElementById('fuelIntl'+i))throw Error('Price list changed. Reimport the file.');
+    record=pertaminaRecord(meta,a[0],document.getElementById('fuelIntl'+i).value,document.getElementById('fuelDom'+i).value,document.getElementById('fuelMulti'+i).value,document.getElementById('fuelDomesticTier').value);
+   }else{
+    if(!document.getElementById('fuelValue'+i))throw Error('Price list changed. Reimport the file.');
+    const price=Number(document.getElementById('fuelValue'+i).value),currency=document.getElementById('fuelCCY'+i).value;
+    if(!Number.isFinite(price)||price<=0)throw Error('Row '+(i+1)+': enter a positive price per liter.');
+    record={...meta,airport:a[0],currency,pricePerLiter:price};
+   }
+   next[a[0]]=record;count++;
   });
   if(!count)throw Error('Select the reviewed rows to import.');
   status.textContent='Saving reviewed fuel prices…';await persistAirportFuelPrices(next);status.textContent=count+' airport fuel price(s) saved to Firebase.';
- }catch(e){status.textContent=e.message}
+ }catch(e){status.textContent=e.message}})();
 }
 
 function priceForAircraft(name){
