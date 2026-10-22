@@ -4,6 +4,7 @@ on:
     paths:
       - 'index.html'
       - 'customization.js'
+      - 'multicity.js'
       - 'app-config.js'
       - 'firestore.rules'
       - 'sw.js'
@@ -45,4 +46,5 @@ jobs:
           name: company-builder-tests
           path: |
             work/company-builder.png
+            work/multi-city-mobile.png
             firestore-debug.log
