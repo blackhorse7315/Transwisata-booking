@@ -2,16 +2,18 @@ const fs=require('node:fs');
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
 const {doc,setDoc,getDoc,updateDoc,serverTimestamp}=require('firebase/firestore');
 (async()=>{
- const source=fs.readFileSync('firestore.rules','utf8').replace("request.auth.uid in ['cIHf6R5zNST1vjwa64zxTgyladm1']; // COMPANY_ADMIN_UIDS","request.auth.uid in ['cIHf6R5zNST1vjwa64zxTgyladm1','normal-admin']; // COMPANY_ADMIN_UIDS");
+ const source=fs.readFileSync('firestore.rules','utf8');
  const env=await initializeTestEnvironment({projectId:'demo-company-builder',firestore:{rules:source,host:'127.0.0.1',port:8080}});
  try{
-  const root=env.authenticatedContext('cIHf6R5zNST1vjwa64zxTgyladm1').firestore();
-  const admin=env.authenticatedContext('normal-admin').firestore();
+  const root=env.authenticatedContext('9AM94kN7gba5U4Si7BmARpXnstD3').firestore();
+  const admin=env.authenticatedContext('cIHf6R5zNST1vjwa64zxTgyladm1').firestore();
   const visitor=env.authenticatedContext('visitor-a').firestore();
   const other=env.authenticatedContext('visitor-b').firestore();
   const guest=env.unauthenticatedContext().firestore();
   await env.withSecurityRulesDisabled(async ctx=>setDoc(doc(ctx.firestore(),'publicSettings','bookingApp'),{customization:{fleetByReg:{'ZZ-TEST':{name:'Demo Helicopter',active:true}}},costs:{}}));
   await assertSucceeds(getDoc(doc(guest,'publicSettings','bookingApp')));
+  await assertSucceeds(getDoc(doc(admin,'privateAdmin','accessCheck')));
+  await assertSucceeds(getDoc(doc(root,'privateAdmin','accessCheck')));
   await assertFails(getDoc(doc(admin,'privateSuperAdmin','accessCheck')));
   await assertSucceeds(getDoc(doc(root,'privateSuperAdmin','accessCheck')));
   await assertFails(updateDoc(doc(admin,'publicSettings','bookingApp'),{customization:{companyName:'Forbidden'}}));
