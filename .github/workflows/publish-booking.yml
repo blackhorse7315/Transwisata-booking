@@ -42,7 +42,7 @@ jobs:
           import io, os, time, urllib.request
           from PIL import Image
           base = os.environ['SITE_URL'].rstrip('/') + '/'
-          for name, size in [('assets/logo.png', None), ('assets/icon-192.png', (192,192)), ('assets/icon-512.png', (512,512)), ('assets/apple-touch-icon.png', (180,180))]:
+          for name, size in [('assets/favicon-32.png', (32,32)), ('assets/logo.png', None), ('assets/icon-192.png', (192,192)), ('assets/icon-512.png', (512,512)), ('assets/apple-touch-icon.png', (180,180))]:
               for attempt in range(6):
                   try:
                       url = base + name + '?build=' + os.environ['GITHUB_SHA']

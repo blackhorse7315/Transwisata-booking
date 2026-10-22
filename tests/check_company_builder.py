@@ -19,11 +19,15 @@ try:
         page.wait_for_timeout(2000)
         assert not errors, errors
         assert page.locator("#fleet .aircraft").count()==5
+        assert page.get_by_text("Aircraft reservation holds expire after 5 minutes.",exact=True).count()==1
+        page.wait_for_function("""async()=>{const link=document.querySelector('link[rel="icon"]');const img=new Image();img.src=link.href;await img.decode();return img.naturalWidth===32&&img.naturalHeight===32}""")
+        print("DEFAULT_FAVICON_CHECK passed")
         page.evaluate("showPage('superAdmin')")
         assert page.locator("#saGate").is_visible()
         assert not page.locator("#saWorkspace").is_visible()
         result=page.evaluate("""()=>{
             const cfg=getCurrentCompanyConfig();
+            const canvas=document.createElement('canvas');canvas.width=canvas.height=64;canvas.getContext('2d').fillRect(0,0,64,64);cfg.iconData=canvas.toDataURL('image/jpeg');
             cfg.companyName='Demo Air';cfg.appName='Demo Air Charter';cfg.heroTitle='Company-configured heading';cfg.primary='#234567';
             cfg.fleet.push({name:'Demo Helicopter',registration:'ZZ-TEST',description:'Configured aircraft',type:'helicopter',planningSpeed:100,rateUSD:123,burnLiters:45,cruiseSpeed:105,endurance:2,seats:4,range:200,dailyHours:4,maxLegMinutes:90,active:true});
             const valid=validateCompanyConfig(cfg);
@@ -41,13 +45,15 @@ try:
         print("COMPANY_EDITOR_CHECKS",json.dumps(result))
         page.wait_for_function("""async()=>{const link=document.querySelector('link[rel="manifest"]');if(!link.href.includes('company='))return false;const response=await fetch(link.href);const manifest=await response.json();return manifest.name==='Demo Air Charter'&&manifest.icons.length===3&&manifest.icons.every(i=>i.src.startsWith('data:image/png;base64,'))}""",timeout=30000)
         print("PWA_MANIFEST_CHECKS passed")
+        page.wait_for_function("""async()=>{const link=document.querySelector('link[rel="icon"]');if(!link.href.startsWith('data:image/png;base64,'))return false;const img=new Image();img.src=link.href;await img.decode();return img.naturalWidth===32&&img.naturalHeight===32}""")
+        print("CUSTOM_JPEG_TO_PNG_FAVICON_CHECK passed")
         with page.expect_download(timeout=90000) as download_info:
             page.evaluate("exportCompanyApp()")
         downloaded=download_info.value
         downloaded.save_as("work/company-app.zip")
         with zipfile.ZipFile("work/company-app.zip") as package:
             files=set(package.namelist())
-            assert {"index.html","customization.js","app-config.js","manifest.webmanifest","sw.js","firestore.rules","assets/icon-192.png","assets/icon-512.png"}.issubset(files)
+            assert {"index.html","customization.js","app-config.js","manifest.webmanifest","sw.js","firestore.rules","assets/icon-192.png","assets/icon-512.png","assets/favicon-32.png"}.issubset(files)
             manifest=json.loads(package.read("manifest.webmanifest"))
             assert manifest["name"]=="Demo Air Charter"
             config=package.read("app-config.js").decode()
