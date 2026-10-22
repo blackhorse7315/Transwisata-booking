@@ -1,0 +1,49 @@
+name: Diagnose public application
+on:
+  push:
+    paths: ['.github/workflows/check-public-app.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install browser
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Inspect public app in Chromium
+        run: |
+          python - <<'PY'
+          import json
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser=p.chromium.launch()
+              page=browser.new_page()
+              errors=[]
+              page.on('pageerror',lambda error: errors.append(str(error)))
+              response=page.goto('https://blackhorse7315.github.io/Transwisata-booking/?diagnostic=logo',wait_until='domcontentloaded',timeout=60000)
+              page.wait_for_timeout(8000)
+              print('HTML_STATUS',response.status)
+              print('JS_ERRORS',json.dumps(errors))
+              print('BRAND_IMAGE',json.dumps(page.locator('.app-brand img').evaluate('(img)=>({src:img.src,complete:img.complete,width:img.naturalWidth,height:img.naturalHeight})')))
+              print('APP_STATE',json.dumps(page.evaluate('({cards:document.querySelectorAll("#fleet .aircraft").length, firebase:!!window.TWAFirebase, holdsReady:!!window.TWAHoldsReady})')))
+              manifest_url=page.locator('link[rel="manifest"]').evaluate('(el)=>el.href')
+              manifest=page.request.get(manifest_url)
+              print('MANIFEST_STATUS',manifest.status)
+              if manifest.ok:
+                  from urllib.parse import urljoin
+                  for icon in manifest.json().get('icons',[]):
+                      url=urljoin(manifest_url,icon['src'])
+                      result=page.request.get(url)
+                      print('ICON_STATUS',json.dumps({'url':url,'status':result.status,'contentType':result.headers.get('content-type')}))
+              page.screenshot(path='public-app.png',full_page=False)
+              browser.close()
+          PY
+      - name: Save diagnostic screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-app-diagnostic
+          path: public-app.png
