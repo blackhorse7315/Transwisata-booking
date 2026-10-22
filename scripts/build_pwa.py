@@ -24,6 +24,7 @@ if min(image.size) < 1:
     raise ValueError("Invalid logo")
 image.save(assets / "logo.png")
 for name, size, inset in (
+    ("favicon-32.png", 32, .04),
     ("icon-192.png", 192, .08),
     ("icon-512.png", 512, .08),
     ("icon-maskable-512.png", 512, .20),
