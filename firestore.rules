@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && request.auth.uid == 'cIHf6R5zNST1vjwa64zxTgyladm1';
+    }
+    match /publicSettings/bookingApp {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /privateAdmin/{documentId} {
+      allow read, write: if isAdmin();
+    }
+    match /bookingRequests/{bookingId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['ref','name','email','phone','from','to','date','time','pax','plane','purpose','trip','returnDate','stops','notes','company','status','estimate','createdAt','createdBy'])
+        && request.resource.data.keys().hasOnly(['ref','name','email','phone','from','to','date','time','pax','plane','purpose','trip','returnDate','stops','notes','company','status','estimate','createdAt','createdBy'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.ref == bookingId
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.status == 'Awaiting Payment Instructions'
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 200
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 50;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['Request Received','Under Review','Quotation Sent','Pending Confirmation','Confirmed','Cancelled'];
+      allow delete: if isAdmin();
+    }
+    // Only public availability fields are stored here; no customer contact details.
+    match /fleetHolds/{registration} {
+      function validAircraft() {
+        return (registration == 'PK-TWY' && request.resource.data.plane == 'Gulfstream IV-SP')
+          || (registration == 'PK-TWX' && request.resource.data.plane == 'King Air 350i')
+          || (registration == 'PK-TWW' && request.resource.data.plane == 'CASA 212-200')
+          || (registration == 'PK-TWV' && request.resource.data.plane == 'Bell 412EP')
+          || (registration == 'PK-TWZ' && request.resource.data.plane == 'AW109S Grand');
+      }
+      function validHold() {
+        return request.resource.data.keys().hasAll(['plane','owner','status','expires','updatedAt'])
+          && request.resource.data.keys().hasOnly(['plane','owner','status','expires','updatedAt'])
+          && validAircraft()
+          && request.resource.data.owner is string
+          && request.resource.data.expires is number
+          && request.resource.data.status in ['pending','released','paid']
+          && request.resource.data.updatedAt == request.time;
+      }
+      function newPendingHold() {
+        return signedIn() && validHold()
+          && request.resource.data.owner == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.expires > request.time.toMillis()
+          && request.resource.data.expires <= request.time.toMillis() + 330000;
+      }
+      allow read: if true;
+      allow create: if newPendingHold();
+      allow update: if validHold() && (
+        isAdmin()
+        || (newPendingHold() && (
+          resource.data.status == 'released'
+          || (resource.data.status == 'pending' && resource.data.expires <= request.time.toMillis())
+        ))
+        || (signedIn() && resource.data.owner == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'released'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
