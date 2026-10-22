@@ -619,7 +619,7 @@ function renderFleetPrices(){
   document.getElementById('routeOriginCode').textContent=[f[0],f[1]].filter(Boolean).join(' / ');
   document.getElementById('routeDestCode').textContent=[t[0],t[1]].filter(Boolean).join(' / ');
   document.getElementById('routeDistance').textContent=num('distance').toFixed(1)+' NM';
-  document.getElementById('routeDate').textContent=date.value||'Select date';
+  document.getElementById('routeDate').textContent=date.value?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(date.value+'T00:00:00Z')):'Select date';
   document.getElementById('routePax').textContent=(pax.value||'—')+' passenger(s)';
  }else{summary.classList.remove('premium-route');summary.textContent='Enter departure and destination to compare prices.';}
  const selector=document.getElementById('fleetCurrency');if(selector)selector.value=currency.value;cards.forEach((card,i)=>{let spec=card.querySelector('.fleet-spec-holder');if(!spec){spec=document.createElement('div');spec.className='fleet-spec-holder';card.querySelector('.details').appendChild(spec)}spec.innerHTML=fleetSpecsMarkup(aircraft[i][0]);});
