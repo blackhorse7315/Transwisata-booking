@@ -14,12 +14,12 @@ const message=text=>{el('saStatus').textContent=text};
 function validImage(value){return value===''||/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)&&value.length<=85000}
 function validateConfig(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Konfigurasi tidak valid.');
- const legacyName=/^transwisata private aviation$/i.test(input.appName||'');
+ const legacyName=/^transwisata private aviation$/i.test(String(input.appName||'').trim().replace(/\s+/g,' '));
  input={...input,webTitle:input.webTitle??(legacyName?defaults.webTitle:input.appName)};
  const out={version:1};
  for(const key of Object.keys(textFields)){if(typeof input[key]!=='string'||input[key].length>1500)throw Error('Teks tidak valid: '+key);out[key]=input[key]}
  if(legacyName)out.appName=defaults.appName;
- if(/^transwisata$/i.test(out.companyName)&&out.tagline==='PRIVATE AVIATION')out.tagline=defaults.tagline;
+ if(/^transwisata$/i.test(out.companyName.trim())&&/^private aviation$/i.test(out.tagline.trim()))out.tagline=defaults.tagline;
  if(out.fleetTitle==='Compare Aircraft & Prices')out.fleetTitle='Aircraft & Charter Estimate';
  if(out.fleetIntro==='Prices update automatically from your route and travel details. Tap View Price Details to see the breakdown.')out.fleetIntro='Select an aircraft to calculate the estimate for your itinerary.';
  for(const key of Object.keys(colorFields)){if(!/^#[0-9a-f]{6}$/i.test(input[key]||''))throw Error('Warna tidak valid: '+key);out[key]=input[key]}
