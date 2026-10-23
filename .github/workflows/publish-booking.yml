@@ -25,7 +25,7 @@ jobs:
           enablement: true
       - name: Prepare static application
         run: |
-          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python -m pip install --disable-pip-version-check Pillow==11.3.0 playwright==1.55.0
           python scripts/build_pwa.py
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
@@ -60,3 +60,37 @@ jobs:
                           raise
                       time.sleep(5)
           PY
+
+      - name: Verify live browser branding
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          mkdir -p work
+          python - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+          base = os.environ["SITE_URL"].rstrip("/") + "/"
+          with sync_playwright() as p:
+              browser = p.chromium.launch(executable_path="/usr/bin/google-chrome")
+              page = browser.new_page()
+              settings = []
+              page.on("response", lambda response: settings.append(response.url) if "firestore.googleapis.com" in response.url else None)
+              try:
+                  page.goto(base + "?release=" + os.environ["GITHUB_SHA"], wait_until="domcontentloaded")
+                  page.wait_for_function("typeof getCurrentCompanyConfig==='function'", timeout=60000)
+                  page.wait_for_timeout(8000)
+                  assert page.title() == "TRANSWISATA ONLINE BOOKING", page.title()
+                  assert page.locator("#appTagline").inner_text() == "PRIMA AVIATION"
+                  assert page.evaluate("getCurrentCompanyConfig().appName") == "TRANSWISATA PRIMA AVIATION"
+                  assert page.evaluate("Array.from(document.scripts).find(s=>s.src.includes('customization.js')).src").endswith("?v=" + os.environ["GITHUB_SHA"])
+                  print("LIVE_BRANDING_VERIFIED", page.title(), page.locator("#appTagline").inner_text(), "Firebase responses:", len(settings))
+              finally:
+                  page.screenshot(path="work/live-branding.png")
+                  browser.close()
+          PY
+      - name: Save live branding evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-branding
+          path: work/live-branding.png

@@ -26,11 +26,20 @@ try:
         assert page.locator("#appTagline").inner_text()=="PRIMA AVIATION"
         assert page.evaluate("getCurrentCompanyConfig().appName")=="TRANSWISATA PRIMA AVIATION"
         page.evaluate("""()=>{
-            const legacy=getCurrentCompanyConfig();delete legacy.webTitle;legacy.appName='Transwisata Private Aviation';legacy.tagline='PRIVATE AVIATION';
+            const legacy=getCurrentCompanyConfig();delete legacy.webTitle;legacy.appName=' Transwisata  Private Aviation ';legacy.tagline=' private aviation ';legacy.companyName='TRANSWISATA ';
             applyCompanyCustomization(legacy);
             if(document.title!=='TRANSWISATA ONLINE BOOKING'||getCurrentCompanyConfig().appName!=='TRANSWISATA PRIMA AVIATION'||document.getElementById('appTagline').textContent!=='PRIMA AVIATION')throw Error('Saved legacy branding overrode requested names');
         }""")
         print("WEB_TITLE_APP_NAME_CHECK passed")
+        assert page.evaluate("Array.from(document.scripts).filter(s=>s.src&&new URL(s.src).origin===location.origin).every(s=>new URL(s.src).searchParams.has('v'))")
+        assert page.evaluate("""async()=>{
+            await navigator.serviceWorker.ready;
+            const registration=await navigator.serviceWorker.getRegistration();await registration.update();
+            const keys=await caches.keys(),cache=await caches.open(keys.find(k=>k.startsWith('transwisata-')));
+            const script=Array.from(document.scripts).find(s=>s.src.includes('customization.js')).src;
+            return !!await cache.match(script);
+        }""")
+        print("RELEASE_VERSIONED_SCRIPTS_CHECK passed")
 
 
         result=page.evaluate("""()=>{

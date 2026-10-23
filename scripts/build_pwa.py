@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import shutil
 import urllib.request
 from pathlib import Path
@@ -12,6 +13,12 @@ for name in ("index.html", "manifest.webmanifest", "customization.js", "multicit
     shutil.copyfile(name, root / name)
 (root / "sw.js").write_text(Path("sw.js").read_text().replace("__BUILD_VERSION__", os.environ["GITHUB_SHA"]), encoding="utf-8")
 (root / ".nojekyll").touch()
+# Version local application scripts so an older HTTP/PWA cache cannot mix releases.
+revision = os.environ["GITHUB_SHA"]
+html = (root / "index.html").read_text(encoding="utf-8")
+html = re.sub(r'(<script\s+src=["\']\./[^"\'?]+\.js)(["\'])', lambda match: match[1] + "?v=" + revision + match[2], html)
+(root / "index.html").write_text(html, encoding="utf-8")
+
 build_runways(root)
 assets = root / "assets"
 assets.mkdir(exist_ok=True)
