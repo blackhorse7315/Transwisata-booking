@@ -168,7 +168,7 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
 <h3>Ground Handling by Airport</h3><p class="small">Add an airport using its IATA (3-letter) or ICAO (4-letter) code. Airport-specific rates override the default handling rate for each airport movement.</p>
 <div class="costgrid"><div><label>Airport IATA / ICAO Code</label><input id="handlingAirport" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. HLP or WIHH"></div><div><label>Ground Handling (<span id="handlingCurrencyLabel">USD</span> / movement)</label><input id="handlingAmount" type="number" min="0" step="0.01" placeholder="350"></div></div><div class="actions"><button class="btn secondary" onclick="addHandlingRate()">Add / Update Airport Rate</button></div><div style="overflow:auto"><table><thead><tr><th>Airport</th><th>Code</th><th id="handlingTableCurrency">Handling USD / movement</th><th>Action</th></tr></thead><tbody id="handlingTable"></tbody></table></div>
 <div class="actions"><button class="btn" onclick="saveAdminCosts()">Save Cost Settings</button><button class="btn secondary" onclick="resetAdminCosts()">Reset to Demo Defaults</button></div><p id="adminSaved" class="small" aria-live="polite"></p>
-<h3>Aircraft Reservation Holds (Live)</h3><p class="small">Setup: publish the repository <a href="https://github.com/blackhorse7315/Transwisata-booking/blob/main/firestore.rules" target="_blank" rel="noopener">firestore.rules</a> in Firebase Console → Firestore → Rules. Anonymous Authentication must be enabled. Reload the page after publishing rules.</p><div id="adminHolds"></div><h3>Charter Booking Requests</h3><p class="small">Requests synchronized with Firestore when Firebase is configured. Only authorized administrators may read cloud requests.</p><div style="overflow:auto"><table><thead><tr><th>Reference</th><th>Customer</th><th>Route</th><th>Date</th><th>Aircraft</th><th>Status</th></tr></thead><tbody id="records"></tbody></table></div><div class="actions"><button class="btn secondary" onclick="exportCSV()">Export Requests CSV</button></div></div></section></main><footer id="appFooter">© 2026 PT Transwisata Prima Aviation · Payment Selection Prototype · No payment collected</footer><script src="./app-config.js"></script><script>
+<h3>Aircraft Reservation Holds (Live)</h3><p class="small">Setup: publish the repository <a href="https://github.com/blackhorse7315/Transwisata-booking/blob/main/firestore.rules" target="_blank" rel="noopener">firestore.rules</a> in Firebase Console → Firestore → Rules. Anonymous Authentication must be enabled. Reload the page after publishing rules.</p><div id="adminHolds"></div><h3>Charter Booking Requests</h3><p class="small">Requests synchronized with Firestore when Firebase is configured. Only authorized administrators may read cloud requests.</p><div style="overflow:auto"><table><thead><tr><th>Reference</th><th>Customer</th><th>Route</th><th>Date</th><th>Aircraft</th><th>Status</th><th>Action</th></tr></thead><tbody id="records"></tbody></table></div><div class="actions"><button class="btn secondary" type="button" id="exportRequestsCSVButton" onclick="exportCSV()">Export Requests CSV</button><button class="btn secondary" type="button" id="exportRequestsPDFButton" onclick="exportRequestsPDF()">Export PDF</button></div><p id="requestActionStatus" class="small" role="status" aria-live="polite"></p></div></section></main><footer id="appFooter">© 2026 PT Transwisata Prima Aviation · Payment Selection Prototype · No payment collected</footer><script src="./app-config.js"></script><script>
 const tenantProject=window.TWA_BOOTSTRAP?.firebase?.projectId||"transwisata-apps-37142";
 const tenantStorage={getItem(key){const scoped=localStorage.getItem("company:"+tenantProject+":"+key);return scoped!==null?scoped:tenantProject==="transwisata-apps-37142"?localStorage.getItem(key):null},setItem(key,value){localStorage.setItem("company:"+tenantProject+":"+key,value)},removeItem(key){localStorage.removeItem("company:"+tenantProject+":"+key);if(tenantProject==="transwisata-apps-37142")localStorage.removeItem(key)}};
 let currentTrip='One Way';
@@ -973,7 +973,158 @@ const aircraft=[['Gulfstream IV-SP','Executive jet','PK-TWY'],['King Air 350i','
  try{tenantStorage.setItem('twaBookings',JSON.stringify([item,...getData()]));}catch(e){alert('Unable to save booking in this browser. Please check browser storage permissions.');return false}
  field('contact').classList.add('hidden');window.TWAFirebase?.createBooking(item).then(()=>{const el=document.getElementById('paymentMessage');if(el){el.style.display='block';el.textContent='Booking request has been received in Firebase. Payment is not collected online.'}}).catch(e=>alert('Booking saved on this device, but Firebase submission FAILED: '+e.message+'. Please contact Transwisata directly.'));openPayment(ref);return true;
 }
-function track(){let item=getData().find(x=>x.ref.toUpperCase()===reference.value.trim().toUpperCase()),el=document.getElementById('tracking');el.style.display='block';el.textContent=item?`${item.ref} · ${item.from} → ${item.to} · ${item.status} (local demo only)`:'No matching reference in this browser.'}function render(){document.getElementById('records').innerHTML=getData().map((x,i)=>`<tr><td>${esc(x.ref)}</td><td>${esc(x.name)}</td><td>${bookingRouteHTML(x)}</td><td>${esc(x.date)}</td><td>${esc(x.plane)}</td><td><select onchange="setStatus(${i},this.value)">${['Request Received','Under Review','Quotation Sent','Pending Confirmation','Confirmed','Cancelled'].map(s=>`<option ${x.status===s?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')||'<tr><td colspan="6">No requests in this browser yet.</td></tr>'}function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function setStatus(i,s){let d=getData();if(!d[i])return;d[i].status=s;if(window.TWAAdminVerified&&window.TWAFirebase){window.TWAFirebase.setBookingStatus(d[i].ref,s).catch(e=>alert('Cloud status update failed: '+e.message))}else{tenantStorage.setItem('twaBookings',JSON.stringify(d))}}function exportCSV(){let rows=getData();if(!rows.length){alert('No requests to export');return}let keys=Object.keys(rows[0]),csv=[keys.join(','),...rows.map(r=>keys.map(k=>'"'+String(r[k]??'').replaceAll('"','""')+'"').join(','))].join('\r\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='transwisata-charter-requests.csv';a.click();URL.revokeObjectURL(a.href)}async function refreshFX(){const status=document.getElementById('fxStatus');status.textContent='Fetching live USD/IDR rate…';try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),7000);const response=await fetch('https://open.er-api.com/v6/latest/USD',{signal:controller.signal,cache:'no-store'});clearTimeout(timeout);if(!response.ok)throw Error('Exchange-rate service unavailable');const data=await response.json();const rate=Number(data.rates?.IDR);if(data.result!=='success'||!Number.isFinite(rate)||rate<=0)throw Error('Invalid exchange-rate data');document.getElementById('fx').value=rate.toFixed(2);status.textContent='Live indicative rate · '+(data.time_last_update_utc||'updated by provider')+' · Source: open.er-api.com';calculateEstimate()}catch(err){status.textContent='Live rate unavailable; editable fallback is in use. Check rate before issuing quotation.';calculateEstimate()}}updatePlaneCosts();updateRoute();refreshFX();
+function track(){let item=getData().find(x=>x.ref.toUpperCase()===reference.value.trim().toUpperCase()),el=document.getElementById('tracking');el.style.display='block';el.textContent=item?`${item.ref} · ${item.from} → ${item.to} · ${item.status} (local demo only)`:'No matching reference in this browser.'}function render(){
+ const rows=getData(),statuses=['Request Received','Under Review','Quotation Sent','Pending Confirmation','Confirmed','Cancelled'],target=document.getElementById('records');
+ target.innerHTML=rows.map((x,i)=>{const options=statuses.includes(x.status)?statuses:[String(x.status||'Request Received'),...statuses],busy=deletingBookingRequests.has(x.ref);return '<tr><td>'+esc(x.ref)+'</td><td>'+esc(x.name)+'</td><td>'+bookingRouteHTML(x)+'</td><td>'+esc(requestDate(x.date))+(x.time?'<br><small>'+esc(x.time)+' WIB</small>':'')+'</td><td>'+esc(x.plane)+'</td><td><select onchange="setStatus('+i+',this.value)" '+(busy?'disabled':'')+'>'+options.map(s=>'<option'+(x.status===s?' selected':'')+(!statuses.includes(s)?' disabled':'')+'>'+esc(s)+'</option>').join('')+'</select></td><td><button type="button" class="btn secondary" data-delete-request="'+esc(x.ref)+'" '+(busy?'disabled':'')+' style="padding:9px 13px;color:#a12b37" aria-label="Delete booking '+esc(x.ref)+'">'+(busy?'Deleting…':'Delete')+'</button></td></tr>'}).join('')||'<tr><td colspan="7">No booking requests found.</td></tr>';
+ target.querySelectorAll('[data-delete-request]').forEach(button=>button.onclick=()=>deleteBookingRequest(button.dataset.deleteRequest));
+}function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function setStatus(i,s){let d=getData();if(!d[i])return;d[i].status=s;if(window.TWAAdminVerified&&window.TWAFirebase){window.TWAFirebase.setBookingStatus(d[i].ref,s).catch(e=>alert('Cloud status update failed: '+e.message))}else{tenantStorage.setItem('twaBookings',JSON.stringify(d))}}
+const deletingBookingRequests=new Set();
+function requestActionMessage(message){const target=document.getElementById('requestActionStatus');if(target)target.textContent=message}
+function requestDate(value){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||'')))return String(value||'');
+ const stamp=Date.parse(value+'T00:00:00Z');return Number.isFinite(stamp)?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(stamp):String(value);
+}
+function requestTimestamp(value){
+ let stamp;if(typeof value?.toDate==='function')stamp=value.toDate().getTime();else if(typeof value?.seconds==='number')stamp=value.seconds*1000;else if(value instanceof Date)stamp=value.getTime();else if(typeof value==='string'||typeof value==='number')stamp=new Date(value).getTime();
+ return Number.isFinite(stamp)?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZone:'Asia/Jakarta'}).format(stamp):'';
+}
+function requestAirport(value){return airportMatch(String(value||''))?.[0]||String(value||'')}
+function requestFlights(item){
+ if(item.trip==='Multi City'){try{const data=typeof item.stops==='string'?JSON.parse(item.stops):item.stops;if(Array.isArray(data?.flights)&&data.flights.length)return data.flights.map(f=>({from:String(f.from||''),to:String(f.to||''),date:String(f.date||''),time:String(f.time||'')}))}catch{}}
+ const flights=[{from:item.from,to:item.to,date:item.date,time:item.time}];
+ if(item.trip==='Round Trip'&&item.returnDate)flights.push({from:item.to,to:item.from,date:item.returnDate,time:''});
+ return flights;
+}
+function requestItinerary(item){
+ return requestFlights(item).map((f,i)=>(i+1)+'. '+requestAirport(f.from)+' -> '+requestAirport(f.to)+' | '+requestDate(f.date)+(f.time?' '+f.time+' WIB':item.trip==='Round Trip'&&i?' | Return time not provided':'')).join('\n');
+}
+function requestEstimateUSD(item){
+ const value=item.estimate?.totalUSD;
+ return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
+}
+function requestExportRows(){
+ if(!window.TWAAdminVerified)throw Error('Admin sign-in is required to export booking requests.');
+ if(!Array.isArray(window.TWACloudBookings))throw Error('Booking requests are still synchronizing. Please wait before exporting.');
+ if(!window.TWACloudBookings.length)throw Error('There are no booking requests to export.');
+ return window.TWACloudBookings.map(item=>({...item}));
+}
+function requestFileName(extension){
+ const config=window.getCurrentCompanyConfig?.(),slug=String(config?.companyName||'Transwisata').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'charter';
+ const stamp=new Date(Date.now()+7*3600000).toISOString().slice(0,19).replace('T','-').replace(/:/g,'');
+ return slug+'-charter-booking-requests-'+stamp+'.'+extension;
+}
+function downloadRequestFile(blob,name){
+ const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+async function deleteBookingRequest(reference){
+ if(deletingBookingRequests.has(reference))return false;
+ if(!window.TWAAdminVerified||!window.TWAFirebase?.deleteBooking){requestActionMessage('Admin sign-in is required to delete a booking request.');return false}
+ if(!navigator.onLine){requestActionMessage('Reconnect to delete a shared booking request.');return false}
+ if(!Array.isArray(window.TWACloudBookings)){requestActionMessage('Booking requests are still synchronizing. Please wait.');return false}
+ const item=window.TWACloudBookings.find(row=>row.ref===reference);if(!item){requestActionMessage('This booking request is no longer available.');return false}
+ if(!confirm('Permanently delete booking request '+reference+' for '+String(item.name||'this customer')+'?'))return false;
+ deletingBookingRequests.add(reference);requestActionMessage('Deleting '+reference+'…');render();
+ try{
+  await window.TWAFirebase.deleteBooking(reference);
+  if(Array.isArray(window.TWACloudBookings))window.TWACloudBookings=window.TWACloudBookings.filter(row=>row.ref!==reference);
+  try{const cached=JSON.parse(tenantStorage.getItem('twaBookings')||'[]');if(Array.isArray(cached))tenantStorage.setItem('twaBookings',JSON.stringify(cached.filter(row=>row.ref!==reference)))}catch(error){console.warn('Booking cache cleanup:',error.message)}
+  requestActionMessage('Booking request '+reference+' deleted.');return true;
+ }catch(error){requestActionMessage('Delete failed: '+(error.code||error.message));return false}
+ finally{deletingBookingRequests.delete(reference);render()}
+}
+function csvRequestCell(value){
+ let text=value===null||value===undefined?'':String(value);text=text.replace(/\u0000/g,'');
+ if(/^[\s\u0001-\u001f]*[=+\-@]/.test(text)||/^[\t\r\n]/.test(text))text="'"+text;
+ return '"'+text.replace(/"/g,'""')+'"';
+}
+function bookingRequestsCSV(rows){
+ const columns=[
+ ['Booking Reference',r=>r.ref],['Customer Name',r=>r.name],['Company',r=>r.company],['Email',r=>r.email],['Phone / WhatsApp',r=>r.phone],
+ ['Trip Type',r=>r.trip],['Departure Airport',r=>requestAirport(r.from)],['Destination Airport',r=>requestAirport(r.to)],
+ ['Departure Date',r=>requestDate(r.date)],['Departure Time (WIB)',r=>r.time],['Return Date',r=>requestDate(r.returnDate)],['Passengers',r=>r.pax],
+ ['Aircraft',r=>r.plane],['Flight Purpose',r=>r.purpose],['Booking Status',r=>r.status],['Estimated Total (USD)',r=>{const total=requestEstimateUSD(r);return total===null?'':total.toFixed(2)}],
+ ['Selected Display Currency',r=>r.estimate?.currency||''],['Payment Method',r=>r.paymentMethod],['Payment Status',r=>r.paymentStatus],
+ ['Flight Itinerary (WIB)',r=>requestItinerary(r)],['Additional Requirements',r=>r.notes],['Created At (WIB)',r=>requestTimestamp(r.createdAt)]
+ ];
+ return '\ufeff'+[columns.map(([label])=>csvRequestCell(label)).join(','),...rows.map(row=>columns.map(([,value])=>csvRequestCell(value(row))).join(','))].join('\r\n');
+}
+function exportCSV(){
+ try{const rows=requestExportRows();downloadRequestFile(new Blob([bookingRequestsCSV(rows)],{type:'text/csv;charset=utf-8;'}),requestFileName('csv'));requestActionMessage(rows.length+' booking request(s) exported as CSV.');return true}
+ catch(error){requestActionMessage('CSV export failed: '+error.message);return false}
+}
+let bookingPDFLibraries=null,bookingPDFBusy=false;
+function loadBookingPDFScript(url){
+ return new Promise((resolve,reject)=>{
+  const script=document.createElement('script'),timeout=setTimeout(()=>{script.remove();reject(Error('PDF components timed out. Check your connection and try again.'))},20000);
+  script.src=url;script.crossOrigin='anonymous';
+  script.onload=()=>{clearTimeout(timeout);resolve()};script.onerror=()=>{clearTimeout(timeout);script.remove();reject(Error('PDF components could not be loaded. Check your connection and try again.'))};document.head.append(script);
+ });
+}
+async function loadBookingPDFLibraries(){
+ if(window.jspdf?.jsPDF?.API.autoTable)return;
+ if(!bookingPDFLibraries)bookingPDFLibraries=(async()=>{
+  if(!window.jspdf?.jsPDF)await loadBookingPDFScript('https://cdn.jsdelivr.net/npm/jspdf@3.0.3/dist/jspdf.umd.min.js');
+  if(!window.jspdf?.jsPDF?.API.autoTable)await loadBookingPDFScript('https://cdn.jsdelivr.net/npm/jspdf-autotable@5.0.2/dist/jspdf.plugin.autotable.min.js');
+  if(!window.jspdf?.jsPDF?.API.autoTable)throw Error('PDF components are unavailable.');
+ })().catch(error=>{bookingPDFLibraries=null;throw error});
+ return bookingPDFLibraries;
+}
+async function requestPDFLogo(){
+ const source=document.getElementById('appBrandLogo')?.src;if(!source)return null;
+ try{return await new Promise((resolve,reject)=>{
+  const image=new Image(),timer=setTimeout(()=>reject(Error('Logo timeout')),5000);
+  image.crossOrigin='anonymous';image.onload=()=>{try{const canvas=document.createElement('canvas');canvas.width=200;canvas.height=200;const context=canvas.getContext('2d');context.fillStyle='#ffffff';context.fillRect(0,0,200,200);const ratio=Math.min(180/image.width,180/image.height),width=image.width*ratio,height=image.height*ratio;context.drawImage(image,(200-width)/2,(200-height)/2,width,height);clearTimeout(timer);resolve(canvas.toDataURL('image/png'))}catch(error){clearTimeout(timer);reject(error)}};
+  image.onerror=()=>{clearTimeout(timer);reject(Error('Logo unavailable'))};image.src=source;
+ })}catch{return null}
+}
+async function bookingRequestsPDF(rows){
+ await loadBookingPDFLibraries();
+ const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true}),logo=await requestPDFLogo();
+ const config=window.getCurrentCompanyConfig?.(),brand=String(config?.appName||'TRANSWISATA PRIMA AVIATION'),generated=requestTimestamp(new Date()),navy=[13,37,64],muted=[88,108,130];
+ doc.setProperties({title:'Charter Booking Requests',subject:'Charter booking requests report',author:brand,creator:'Online Booking Administration'});
+ const margin={top:45,right:14,bottom:17,left:14},styles={font:'helvetica',fontSize:8,cellPadding:2.5,textColor:[27,46,66],lineColor:[222,230,239],lineWidth:.15,overflow:'linebreak',valign:'top'};
+ doc.autoTable({
+  startY:45,margin,theme:'grid',styles,headStyles:{fillColor:navy,textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,248,252]},showHead:'everyPage',rowPageBreak:'auto',
+  head:[['Reference','Customer / Contact','Route / Itinerary (WIB)','Departure (WIB)','Aircraft','Pax','Status','Estimate (USD)']],
+  body:rows.map(r=>[String(r.ref||''),[r.name,r.company,r.email,r.phone].filter(Boolean).join('\n'),r.trip==='Multi City'?requestItinerary(r):requestFlights(r).map(f=>requestAirport(f.from)+' -> '+requestAirport(f.to)).join('\n'),requestDate(r.date)+(r.time?'\n'+r.time:'')+(r.returnDate?'\nReturn: '+requestDate(r.returnDate):''),String(r.plane||''),String(r.pax||''),String(r.status||''),requestEstimateUSD(r)===null?'Not quoted':requestEstimateUSD(r).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})]),
+  columnStyles:{0:{cellWidth:30,fontStyle:'bold'},1:{cellWidth:49},2:{cellWidth:49},3:{cellWidth:30},4:{cellWidth:30},5:{cellWidth:10,halign:'center'},6:{cellWidth:35},7:{cellWidth:36,halign:'right'}},
+  didParseCell:data=>{if(data.section==='body'&&data.column.index===6){const status=rows[data.row.index]?.status;data.cell.styles.fontStyle='bold';data.cell.styles.textColor=status==='Confirmed'?[20,117,75]:status==='Cancelled'?[171,47,55]:muted}}
+ });
+ const details=rows.filter(r=>r.notes||r.purpose||r.paymentMethod||r.paymentStatus);
+ if(details.length){
+  doc.autoTable({startY:doc.lastAutoTable.finalY+8,margin,theme:'grid',styles,headStyles:{fillColor:navy,textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,248,252]},showHead:'everyPage',rowPageBreak:'auto',
+   head:[['Request Details · Reference','Flight Purpose / Trip Type','Payment','Additional Requirements']],
+   body:details.map(r=>[String(r.ref||''),[r.purpose,r.trip].filter(Boolean).join('\n'),[r.paymentMethod,r.paymentStatus].filter(Boolean).join('\n')||'Not specified',String(r.notes||'None')]),
+   columnStyles:{0:{cellWidth:42,fontStyle:'bold'},1:{cellWidth:52},2:{cellWidth:52},3:{cellWidth:123}}
+  });
+ }
+ const pages=doc.getNumberOfPages(),width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight();
+ for(let page=1;page<=pages;page++){
+  doc.setPage(page);if(logo)doc.addImage(logo,'PNG',14,9,20,20);
+  const left=logo?38:14;
+  doc.setTextColor(...navy);doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text(doc.splitTextToSize(brand,170).slice(0,1),left,15);
+  doc.setFontSize(17);doc.text('Charter Booking Requests',left,24);
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(...muted);doc.text('Generated '+generated+' WIB',left,31);
+  doc.text(rows.length+' request(s) · All statuses',width-14,31,{align:'right'});
+  doc.setDrawColor(211,169,92);doc.setLineWidth(.65);doc.line(14,37,width-14,37);
+  doc.setDrawColor(223,230,238);doc.setLineWidth(.2);doc.line(14,height-13,width-14,height-13);
+  doc.setFontSize(7);doc.text('Indicative estimates in USD · Subject to operational confirmation',14,height-8);
+  doc.text('Page '+page+' of '+pages,width-14,height-8,{align:'right'});
+ }
+ return doc.output('blob');
+}
+async function exportRequestsPDF(){
+ if(bookingPDFBusy)return false;
+ const button=document.getElementById('exportRequestsPDFButton');
+ try{
+  const rows=requestExportRows();bookingPDFBusy=true;if(button)button.disabled=true;requestActionMessage('Preparing PDF report…');
+  const blob=await bookingRequestsPDF(rows);
+  if(!window.TWAAdminVerified)throw Error('Admin sign-in is required to export booking requests.');
+  downloadRequestFile(blob,requestFileName('pdf'));requestActionMessage(rows.length+' booking request(s) exported as PDF.');return true;
+ }catch(error){requestActionMessage('PDF export failed: '+error.message);return false}
+ finally{bookingPDFBusy=false;if(button)button.disabled=false}
+}
+async function refreshFX(){const status=document.getElementById('fxStatus');status.textContent='Fetching live USD/IDR rate…';try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),7000);const response=await fetch('https://open.er-api.com/v6/latest/USD',{signal:controller.signal,cache:'no-store'});clearTimeout(timeout);if(!response.ok)throw Error('Exchange-rate service unavailable');const data=await response.json();const rate=Number(data.rates?.IDR);if(data.result!=='success'||!Number.isFinite(rate)||rate<=0)throw Error('Invalid exchange-rate data');document.getElementById('fx').value=rate.toFixed(2);status.textContent='Live indicative rate · '+(data.time_last_update_utc||'updated by provider')+' · Source: open.er-api.com';calculateEstimate()}catch(err){status.textContent='Live rate unavailable; editable fallback is in use. Check rate before issuing quotation.';calculateEstimate()}}updatePlaneCosts();updateRoute();refreshFX();
 const defaultCostConfig={fuelPrice:5,handling:350,landing:180,parking:100,parkingDays:0,navFee:90,crew:250,crewDays:1,positioning:0,otherFees:0,service:0,tax:0};
 const editableCostLabels={fuelPrice:'Fuel Price (USD / liter)',handling:'Default Ground Handling (<span class="handling-currency-label">USD</span> / movement)',landing:'Landing Fee (USD / landing)',parking:'Parking (USD / day)',parkingDays:'Parking Days',navFee:'Navigation (USD / flight hour)',crew:'Crew Expenses (USD / day)',crewDays:'Crew Duty Days',positioning:'Positioning Flight Hours',otherFees:'Permits, Catering & Other (USD)',service:'Service Charge (%)',tax:'Tax (%)'};
 let handlingRates={};
@@ -1137,7 +1288,7 @@ updateHoldUI();
 </script><script src="./multicity.js"></script><script src="./runway-data.js"></script><script src="./runways.js"></script><script src="./navigation.js"></script><script src="./customization.js"></script><script type="module" id="twaFirebaseModule">
 import {initializeApp,deleteApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInAnonymously,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import {getFirestore,doc,setDoc,getDoc,collection,addDoc,updateDoc,onSnapshot,serverTimestamp,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+import {getFirestore,doc,setDoc,getDoc,collection,addDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import {getStorage,ref as storageRef,uploadBytes,getDownloadURL,deleteObject} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js';
 const config=window.TWA_BOOTSTRAP?.firebase||{"apiKey":"AIzaSyCoe4PMWxWGoySF-zrvQCm_j5UnVagflUc","authDomain":"transwisata-apps-37142.firebaseapp.com","projectId":"transwisata-apps-37142","storageBucket":"transwisata-apps-37142.firebasestorage.app","messagingSenderId":"488548515782","appId":"1:488548515782:web:4bd8214637d61069efbcc7","measurementId":"G-QLN8QJS20D"};
 const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app),storage=getStorage(app);
@@ -1252,6 +1403,7 @@ window.TWAFirebase={
   const docData={...fields,estimate:estimate?{totalUSD:Number(estimate.totalUSD||0),currency:String(estimate.currency||'USD')}:null,createdAt:serverTimestamp(),createdBy:auth.currentUser.uid};
   await setDoc(doc(db,'bookingRequests',item.ref),docData);
  },
+ deleteBooking:async(id)=>{if(!window.TWAAdminVerified)throw Error('Admin sign-in required');if(typeof id!=='string'||!id||id.includes('/'))throw Error('Invalid booking reference');await deleteDoc(doc(db,'bookingRequests',id));},
  setBookingStatus:async(id,status)=>{if(!window.TWAAdminVerified)throw Error('Admin sign-in required');await updateDoc(doc(db,'bookingRequests',id),{status})}
 };
 onAuthStateChanged(auth,async user=>{

@@ -1,4 +1,5 @@
-import json, os, subprocess, time, zipfile
+import csv, json, os, subprocess, time, zipfile
+from pypdf import PdfReader
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -323,6 +324,94 @@ try:
             }
         }""")
         print("BOOKING_WINDOW_CHECKS",json.dumps(result))
+
+        # Admin request exports must be actual downloadable files; deletion uses stable references.
+        page.evaluate("""()=>{
+            window.requestTestOriginal={admin:TWAAdminVerified,cloud:TWACloudBookings,firebase:TWAFirebase,cache:tenantStorage.getItem('twaBookings')};
+            const first={ref:'TWA-REPORT-001',name:'Doe, "Jane"',email:'jane@example.com',phone:'+628123456789',company:'Ocean, Ltd',from:'HLP',to:'PKU',date:'2026-10-23',time:'09:00',pax:'4',plane:'Gulfstream IV-SP',purpose:'Corporate Charter',trip:'One Way',returnDate:'',stops:'',notes:'Vegetarian catering, please\\nMeet at terminal 2',status:'Awaiting Payment Instructions',estimate:{totalUSD:12500.5,currency:'IDR'},createdAt:{seconds:1792724400}};
+            const second={...first,ref:'TWA-REPORT-002',name:'=SUM(1,2)',from:'HLP',to:'DPS',trip:'Multi City',status:'Cancelled',estimate:{totalUSD:0,currency:'USD'},paymentMethod:'Bank Transfer',paymentStatus:'Awaiting instructions',stops:JSON.stringify({version:1,flights:[{from:'HLP',to:'SUB',date:'2026-10-24',time:'09:00'},{from:'SUB',to:'DPS',date:'2026-10-25',time:'10:30'}]})};
+            const third={...first,ref:'TWA-REPORT-003',name:'Zoë Martin',plane:'Bell 412EP',trip:'Round Trip',date:'2026-10-26',returnDate:'2026-10-28',status:'Confirmed',estimate:null};
+            window.requestFixtures=[first,second,third];window.requestDeleteWrites=[];window.requestDeleteMode='fail';
+            window.TWAAdminVerified=false;window.TWACloudBookings=requestFixtures.slice();
+            window.TWAFirebase={deleteBooking:async reference=>{
+                requestDeleteWrites.push(reference);
+                if(requestDeleteMode==='fail')throw Error('Simulated permission error');
+                if(requestDeleteMode==='pending')await new Promise(resolve=>window.resolveRequestDelete=resolve);
+                window.TWACloudBookings=window.TWACloudBookings.slice().reverse();render();
+            }};
+            tenantStorage.setItem('twaBookings',JSON.stringify([...requestFixtures,{ref:'TWA-LOCAL-KEEP'}]));
+        }""")
+        assert page.evaluate("exportCSV()") is False
+        assert page.evaluate("exportRequestsPDF()") is False
+        assert page.evaluate("deleteBookingRequest('TWA-REPORT-001')") is False
+        assert page.evaluate("requestDeleteWrites.length")==0
+        page.evaluate("window.TWAAdminVerified=true;syncAdminView();showPage('admin');render()")
+        assert page.locator("#records [data-delete-request]").count()==3
+        assert page.locator("#records tr").first.locator("select").input_value()=="Awaiting Payment Instructions"
+        with page.expect_download() as download_info:
+            page.locator("#exportRequestsCSVButton").click()
+        download_info.value.save_as("work/charter-booking-requests.csv")
+        raw_csv=Path("work/charter-booking-requests.csv").read_bytes()
+        assert raw_csv.startswith(b"\xef\xbb\xbf")
+        with open("work/charter-booking-requests.csv",encoding="utf-8-sig",newline="") as handle:
+            exported=list(csv.DictReader(handle))
+        assert len(exported)==3 and len(exported[0])==22
+        assert exported[0]["Customer Name"]=='Doe, "Jane"'
+        assert exported[0]["Phone / WhatsApp"]=="'+628123456789"
+        assert exported[0]["Additional Requirements"]=="Vegetarian catering, please\nMeet at terminal 2"
+        assert exported[0]["Estimated Total (USD)"]=="12500.50"
+        assert exported[1]["Customer Name"]=="'=SUM(1,2)"
+        assert exported[1]["Estimated Total (USD)"]=="0.00"
+        assert "HLP -> SUB" in exported[1]["Flight Itinerary (WIB)"] and "25 Oct 2026 10:30 WIB" in exported[1]["Flight Itinerary (WIB)"]
+        assert exported[2]["Estimated Total (USD)"]==""
+        assert "[object Object]" not in raw_csv.decode("utf-8-sig")
+        print("BOOKING_CSV_EXPORT_CHECKS passed")
+        page.evaluate("""()=>{
+            window.TWACloudBookings=[...requestFixtures,...Array.from({length:32},(_,i)=>({...requestFixtures[2],ref:'TWA-PDF-'+String(i).padStart(3,'0'),name:'PDF Customer '+i,notes:'Additional requirements for request '+i+'. '}))];render();
+        }""")
+        with page.expect_download(timeout=90000) as download_info:
+            page.locator("#exportRequestsPDFButton").click()
+        download_info.value.save_as("work/charter-booking-requests.pdf")
+        pdf=PdfReader("work/charter-booking-requests.pdf")
+        assert len(pdf.pages)>=2
+        report_text="\n".join(page.extract_text() for page in pdf.pages)
+        assert pdf.metadata.title=="Charter Booking Requests"
+        for expected in ["TRANSWISATA PRIMA AVIATION","Charter Booking Requests","TWA-REPORT-001","TWA-PDF-031","12,500.50","Not quoted","Additional Requirements","HLP -> SUB","Page 1 of"]:
+            assert expected in report_text, expected
+        assert "[object Object]" not in report_text
+        print("BOOKING_PDF_EXPORT_CHECKS passed",len(pdf.pages),"pages")
+        page.evaluate("window.TWACloudBookings=requestFixtures.slice();render()")
+        page.once("dialog",lambda dialog:dialog.dismiss())
+        page.locator('[data-delete-request="TWA-REPORT-001"]').click()
+        assert page.evaluate("requestDeleteWrites.length")==0
+        page.once("dialog",lambda dialog:dialog.accept())
+        page.locator('[data-delete-request="TWA-REPORT-001"]').click()
+        page.wait_for_function("document.getElementById('requestActionStatus').textContent.includes('Delete failed')")
+        assert page.locator('[data-delete-request="TWA-REPORT-001"]').count()==1
+        assert page.evaluate("JSON.parse(tenantStorage.getItem('twaBookings')).some(r=>r.ref==='TWA-REPORT-001')")
+        page.evaluate("window.requestDeleteMode='pending'")
+        page.once("dialog",lambda dialog:dialog.accept())
+        page.locator('[data-delete-request="TWA-REPORT-001"]').click()
+        assert page.locator('[data-delete-request="TWA-REPORT-001"]').is_disabled()
+        assert page.evaluate("deleteBookingRequest('TWA-REPORT-001')") is False
+        page.evaluate("resolveRequestDelete()")
+        page.wait_for_function("!TWACloudBookings.some(r=>r.ref==='TWA-REPORT-001')")
+        assert page.locator('[data-delete-request="TWA-REPORT-001"]').count()==0
+        assert page.locator('[data-delete-request="TWA-REPORT-002"]').count()==1
+        assert page.locator('[data-delete-request="TWA-REPORT-003"]').count()==1
+        assert page.evaluate("JSON.parse(tenantStorage.getItem('twaBookings')).some(r=>r.ref==='TWA-LOCAL-KEEP')&&!JSON.parse(tenantStorage.getItem('twaBookings')).some(r=>r.ref==='TWA-REPORT-001')")
+        assert page.evaluate("requestDeleteWrites.join(',')")=="TWA-REPORT-001,TWA-REPORT-001"
+        page.evaluate("window.TWACloudBookings=[];render()")
+        assert page.evaluate("exportCSV()") is False
+        assert page.evaluate("exportRequestsPDF()") is False
+        assert page.locator("#records td").get_attribute("colspan")=="7"
+        print("BOOKING_DELETE_CHECKS passed: cancel, failure, stable reference, duplicate-click guard, cache cleanup")
+        page.evaluate("""()=>{
+            window.TWAAdminVerified=requestTestOriginal.admin;window.TWACloudBookings=requestTestOriginal.cloud;window.TWAFirebase=requestTestOriginal.firebase;
+            if(requestTestOriginal.cache===null)tenantStorage.removeItem('twaBookings');else tenantStorage.setItem('twaBookings',requestTestOriginal.cache);
+            render();syncAdminView();
+        }""")
+
 
         assert not errors, errors
 
