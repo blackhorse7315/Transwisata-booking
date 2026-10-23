@@ -161,6 +161,51 @@ function suggest(){
  menu.hidden=!candidates.length;sequence.setAttribute('aria-expanded',String(!!candidates.length));
 }
 sequence.addEventListener('input',suggest);sequence.addEventListener('focus',suggest);sequence.addEventListener('blur',()=>setTimeout(closeMenu,160));sequence.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();if(event.key==='Enter'&&!menu.hidden){event.preventDefault();menu.querySelector('button')?.click()}});
+
+panel.insertAdjacentHTML('beforeend','<h4>Import VFR Points · Multiple Lines</h4><p class="small">Paste one point per line: name, latitude, longitude. Coordinates are read automatically. Review the preview, then import all points together. Existing names will be updated exactly as entered.</p><label for="navVfrBulkInput">VFR points · name and DMS coordinates</label><textarea id="navVfrBulkInput" rows="7" spellcheck="false" placeholder="PIMAL S06 15&#39;58&quot; E106 47&#39;08&quot;&#10;GUSAN S05 46&#39;00&quot; E105 47&#39;05&quot;"></textarea><p id="navVfrBulkStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrBulkPreview" style="overflow:auto"></div><div class="actions"><button id="navVfrBulkSave" class="btn" type="button" disabled>Import VFR Points</button></div>');
+let bulkSaving=false;
+window.parseVFRBulkInput=function(text){
+ const records=[],names=new Set();
+ String(text||'').split(/\r?\n/).forEach((line,index)=>{
+  if(!line.trim())return;
+  try{
+   const match=line.trim().toUpperCase().match(/^([A-Z][A-Z0-9]{1,11})\s+([NS]\s*\d.*?)[\s,;]+([EW]\s*\d.*)$/);
+   if(!match)throw Error('Use NAME S06 15\'58" E106 47\'08".');
+   const r=validateRecord('vfrPoints',{name:match[1],lat:navDmsToDecimal(match[2],'lat'),lon:navDmsToDecimal(match[3],'lon')});
+   validateCollisions('vfrPoints',r);
+   if(names.has(r.name))throw Error('Duplicate point '+r.name+'.');
+   names.add(r.name);records.push(r);
+  }catch(error){throw Error('Line '+(index+1)+': '+error.message)}
+ });
+ if(!records.length||records.length>500)throw Error('Paste 1–500 VFR points.');
+ if(new Set([...Object.keys(directory.vfrPoints),...names]).size>500)throw Error('The shared VFR directory supports up to 500 points.');
+ return records;
+};
+function previewBulk(){
+ const button=el('navVfrBulkSave'),status=el('navVfrBulkStatus'),preview=el('navVfrBulkPreview');
+ try{
+  const records=parseVFRBulkInput(el('navVfrBulkInput').value);
+  preview.innerHTML='<table><thead><tr><th>Name VFR</th><th>Latitude</th><th>Longitude</th><th>Action</th></tr></thead><tbody>'+records.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+esc(navDecimalToDms(r.lat,'lat'))+'</td><td>'+esc(navDecimalToDms(r.lon,'lon'))+'</td><td>'+(directory.vfrPoints[r.name]?'Update':'Add')+'</td></tr>').join('')+'</tbody></table>';
+  status.textContent=records.length+' points detected. Review coordinates before importing.';button.disabled=bulkSaving;return records;
+ }catch(error){preview.replaceChildren();status.textContent=el('navVfrBulkInput').value.trim()?error.message:'';button.disabled=true;return null}
+}
+window.importVFRBulkInput=async function(){
+ if(bulkSaving)return false;
+ const status=el('navVfrBulkStatus');
+ if(!window.TWAAdminVerified||!window.TWAFirebase?.saveVFRPoints){status.textContent='Authorized Admin sign-in is required.';return false}
+ if(!navigator.onLine){status.textContent='Reconnect to import shared VFR points.';return false}
+ const records=previewBulk();if(!records)return false;
+ bulkSaving=true;el('navVfrBulkSave').disabled=true;el('navVfrBulkInput').disabled=true;status.textContent='Saving '+records.length+' VFR points to Firebase…';
+ try{
+  await window.TWAFirebase.saveVFRPoints(records);
+  applyNavigationDirectory({...directory,vfrPoints:{...directory.vfrPoints,...Object.fromEntries(records.map(r=>[r.name,r]))}});
+  status.textContent=records.length+' VFR points saved to Firebase and available to online devices.';return true;
+ }catch(error){status.textContent='Import failed: '+error.message;return false}
+ finally{bulkSaving=false;el('navVfrBulkInput').disabled=false;el('navVfrBulkSave').disabled=false}
+};
+el('navVfrBulkInput').addEventListener('input',previewBulk);
+el('navVfrBulkSave').onclick=()=>importVFRBulkInput();
+
 try{applyNavigationDirectory(JSON.parse(tenantStorage.getItem('twaNavigationDirectoryV1')||'{}'))}catch(error){applyNavigationDirectory({})}
 drawNavigationAdmin();
 })();
