@@ -51,7 +51,7 @@ window.renderFleetPrices=function(){
  render();
  document.querySelectorAll('#fleet .aircraft').forEach((card,i)=>{
   const name=aircraft[i][0],check=checkRunwayCompatibility(name);card.querySelector('.runway-assessment')?.remove();
-  if(!check.applicable)return;
+  if(el('plane').value!==name||!check.applicable)return;
   const note=document.createElement('div');note.className='runway-assessment';
   if(check.airports.length&&!check.eligible){
    note.innerHTML=markup(check);
@@ -70,10 +70,9 @@ window.calculateEstimate=function(){
  const chosen=el('plane').value;if(chosen&&!checkRunwayCompatibility(chosen).eligible){lastEstimate=null;el('grandTotal').textContent='Runway verification required'}
 };
 window.showPriceDetails=function(index){
- const name=aircraft[index]?.[0];if(!name)return;
+ const name=aircraft[index]?.[0];if(!name||el('plane').value!==name)return;
  const check=checkRunwayCompatibility(name);
  if(check.applicable&&check.airports.length&&!check.eligible){showNotice(name,check);return}
- if(el('plane').value!==name){el('plane').value=name;window.updatePlaneCosts()}
  el('modalBookButton').hidden=false;show(index);
  if(check.applicable&&check.airports.length)el('priceModalContent').insertAdjacentHTML('beforeend',details(check));
 };
