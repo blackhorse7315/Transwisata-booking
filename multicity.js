@@ -91,7 +91,8 @@ window.priceForAircraft=function(name,sector=null){
 window.calculateEstimate=function(){
  if(currentTrip!=='Multi City')return original.calculate();
  const error=problem();el('multiCityError').textContent=error;serialize();
- const name=el('plane').value||aircraft[0][0],p=window.priceForAircraft(name);
+ if(!el('plane').value){el('flightHours').value='';el('costRows').replaceChildren();el('grandTotal').textContent='Select an aircraft';lastEstimate=null;window.renderFleetPrices();return}
+ const name=el('plane').value,p=window.priceForAircraft(name);
  if(!p){el('flightHours').value='';el('costRows').replaceChildren();el('grandTotal').textContent='Complete all flights';lastEstimate=null;window.renderFleetPrices();return}
  el('flightHours').value=p.hours.toFixed(2);el('flightTimeInfo').textContent=timeLabel(p.hours)+' total airborne across '+p.legs+' flights';
  el('costNote').textContent='Estimate includes every entered flight and proposed refuel sectors. Schedules, ground time and overnight arrangements require Operations confirmation.';
@@ -103,9 +104,9 @@ window.calculateEstimate=function(){
 window.renderFleetPrices=function(){
  original.render();if(currentTrip!=='Multi City')return;
  const flights=getMultiCityFlights(),summary=el('fleetRouteSummary'),valid=!problem();
- if(!valid){summary.classList.remove('premium-route');summary.textContent='Complete all Multi City flights to compare total prices.'}
+ if(!valid){summary.classList.remove('premium-route');summary.textContent='Complete all Multi City flights and select an aircraft to view its total estimate.'}
  else {const final=airportMatch(flights.at(-1).to);el('routeDestName').textContent=final[2];el('routeDestCode').textContent=[final[0],final[1]].join(' / ');el('routeDistance').textContent=flights.reduce((s,f,i)=>s+distanceNM(airportMatch(f.from),airportMatch(f.to))+(i&&airportMatch(flights[i-1].to)!==airportMatch(f.from)?distanceNM(airportMatch(flights[i-1].to),airportMatch(f.from)):0),0).toFixed(1)+' NM · '+flights.length+' flights';el('routeDate').textContent=dayLabel(flights[0].date)+(flights.at(-1).date!==flights[0].date?' – '+dayLabel(flights.at(-1).date):'')}
- document.querySelectorAll('#fleet .aircraft').forEach((card,i)=>{const name=aircraft[i][0],p=window.priceForAircraft(name),meta=card.querySelector('.fleet-meta');
+ document.querySelectorAll('#fleet .aircraft').forEach((card,i)=>{const name=aircraft[i][0];if(el('plane').value!==name)return;const p=window.priceForAircraft(name),meta=card.querySelector('.fleet-meta');
  if(p)meta.textContent='Estimated total · '+timeLabel(p.hours)+' airborne · '+p.legs+' flights'+(p.positions.length?' + '+p.positions.length+' positioning':'')+' · '+p.nm.toFixed(0)+' NM';
  else if(valid)meta.textContent=isHelicopter(name)?'Route unavailable or combined daily flight limit exceeded ('+planningLimits[name].daily+' h/day). Adjust the flight dates or routing.':'Route unavailable.';
  });
@@ -121,7 +122,7 @@ window.showPriceDetails=function(index){
  el('priceModalContent').innerHTML='<h3>Multi City itinerary</h3>'+itineraryHTML(p.flights)+p.quotes.map((q,i)=>'<details'+(i===0?' open':'')+'><summary>Flight '+(i+1)+': '+esc(q.route)+' · '+timeLabel(q.hours)+'</summary><div class="route-map">'+offlineMap(q.plan?q.plan.points:[airportMatch(p.flights[i].from),airportMatch(p.flights[i].to)])+'</div>'+(q.plan?routePlanningHTML(q.plan):'')+'</details>').join('')+p.positions.map(pos=>'<p class="mc-itinerary"><strong>Aircraft positioning before Flight '+pos.flight+': '+esc(pos.quote.route)+'</strong><br>'+timeLabel(pos.quote.hours)+' · included in total</p>').join('')+'<h3>All flights · estimated price breakdown</h3>'+p.items.map(x=>'<div class="costrow"><span>'+esc(x[0])+'</span><strong>'+formatPrice(x[1])+'</strong></div>').join('')+'<div class="modal-total">Estimated total: '+formatPrice(p.total)+'</div><p class="small">Includes all entered flights and proposed refuel sectors. Confirm schedules, aircraft performance, fuel supply, ground time, overnight costs and permits with Operations.</p>';
  el('modalBookButton').onclick=()=>{closePriceDetails();choose(entry[0])};el('priceModal').classList.remove('hidden');
 };
-window.next=function(){if(currentTrip==='Multi City'){if(!validateMultiCity(true))return;if(+el('pax').value<1)return alert('Enter a valid passenger count.');if(!window.priceForAircraft(el('plane').value||aircraft[0][0]))return alert('Adjust the itinerary or aircraft to meet route and daily flight limits.');el('contact').classList.remove('hidden');el('contact').scrollIntoView({behavior:'smooth'});return}return original.next()};
+window.next=function(){if(currentTrip==='Multi City'){if(!validateMultiCity(true))return;if(+el('pax').value<1)return alert('Enter a valid passenger count.');if(!el('plane').value)return alert('Please select an aircraft to view its estimate.');if(!window.priceForAircraft(el('plane').value))return alert('Adjust the itinerary or aircraft to meet route and daily flight limits.');el('contact').classList.remove('hidden');el('contact').scrollIntoView({behavior:'smooth'});return}return original.next()};
 window.renderPaymentSummary=function(){original.payment();const b=getData().find(x=>x.ref===activePaymentRef);if(b?.trip==='Multi City')el('paymentSummary').insertAdjacentHTML('beforeend',bookingRouteHTML(b))};
 window.track=function(){original.track();const b=getData().find(x=>x.ref.toUpperCase()===el('reference').value.trim().toUpperCase());if(b?.trip==='Multi City')el('tracking').insertAdjacentHTML('beforeend',bookingRouteHTML(b))};
 [...new Set([...costIds,'from','to','date','time','pax','returnDate'])].forEach(id=>el(id).addEventListener('input',changed));
