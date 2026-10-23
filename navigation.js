@@ -165,23 +165,28 @@ function suggest(){
 }
 sequence.addEventListener('input',suggest);sequence.addEventListener('focus',suggest);sequence.addEventListener('blur',()=>setTimeout(closeMenu,160));sequence.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();if(event.key==='Enter'&&!menu.hidden){event.preventDefault();menu.querySelector('button')?.click()}});
 
-panel.insertAdjacentHTML('beforeend','<h4>Import VFR Points · Multiple Lines</h4><p class="small">Paste one point per line: name, latitude, longitude. Coordinates are read automatically. Review the preview, then import all points together. Names may contain spaces; an optional VFR suffix is ignored. Existing names will be updated.</p><label for="navVfrBulkInput">VFR points · name and DMS coordinates</label><textarea id="navVfrBulkInput" rows="7" spellcheck="false" placeholder="PIMAL S06 15&#39;58&quot; E106 47&#39;08&quot;&#10;GUSAN S05 46&#39;00&quot; E105 47&#39;05&quot;"></textarea><p id="navVfrBulkStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrBulkPreview" style="overflow:auto"></div><div class="actions"><button id="navVfrBulkSave" class="btn" type="button" disabled>Import VFR Points</button></div>');
+panel.insertAdjacentHTML('beforeend','<h4>Import VFR Points · Up to 400 Points</h4><p class="small">Paste up to 400 points: name, latitude, longitude. Separate lines or a single paragraph are accepted. Coordinates are read automatically. Review the preview, then import all points together. Names may contain spaces; an optional VFR suffix is ignored. Existing names will be updated.</p><label for="navVfrBulkInput">VFR points · name and DMS coordinates</label><textarea id="navVfrBulkInput" rows="7" spellcheck="false" placeholder="PIMAL S06 15&#39;58&quot; E106 47&#39;08&quot;&#10;GUSAN S05 46&#39;00&quot; E105 47&#39;05&quot;"></textarea><p id="navVfrBulkStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrBulkPreview" style="overflow:auto"></div><div class="actions"><button id="navVfrBulkSave" class="btn" type="button" disabled>Import VFR Points</button></div>');
 let bulkSaving=false;
 window.parseVFRBulkInput=function(text){
- const records=[],names=new Set();
- String(text||'').split(/\r?\n/).forEach((line,index)=>{
-  if(!line.trim())return;
+ const source=String(text||'').replace(/\u00a0/g,' ').trim().toUpperCase(),records=[],names=new Set();
+ // Locate complete coordinate pairs instead of relying on line breaks retained by copy/paste.
+ const dms=hemisphere=>hemisphere+String.raw`\s*\d{1,3}(?:\s*°\s*|\s+)\d{1,2}(?:\s*['\u2032\u2019]\s*|\s+)\d{1,2}(?:[.,]\d+)?\s*["\u2033\u201d]?`;
+ const pairs=new RegExp('('+dms('[NS]')+')[\\s,;]+('+dms('[EW]')+')','g');
+ let cursor=0,match;
+ while((match=pairs.exec(source))){
+  const number=records.length+1,line=source.slice(0,match.index).split(/\r\n|[\r\n]/).length;
   try{
-   const match=line.trim().toUpperCase().replace(/\s+VFR\s*$/,'').match(/^([A-Z][A-Z0-9]*(?:\s+[A-Z0-9]+)*?)\s+([NS]\s*\d.*?)[\s,;]+([EW]\s*\d.*)$/);
-   if(!match)throw Error('Use NAME S06 15\'58" E106 47\'08".');
-   const r=validateRecord('vfrPoints',{name:match[1],lat:navDmsToDecimal(match[2],'lat'),lon:navDmsToDecimal(match[3],'lon')});
+   const rawName=source.slice(cursor,match.index).trim().replace(cursor?/^VFR(?:\s+|$)/:/^$/,'').trim().replace(/^[,;]+\s*/,'').trim();
+   const r=validateRecord('vfrPoints',{name:rawName,lat:navDmsToDecimal(match[1],'lat'),lon:navDmsToDecimal(match[2],'lon')});
    validateCollisions('vfrPoints',r);
    if(names.has(r.name))throw Error('Duplicate point '+r.name+'.');
-   names.add(r.name);records.push(r);
-  }catch(error){throw Error('Line '+(index+1)+': '+error.message)}
- });
- if(!records.length||records.length>500)throw Error('Paste 1–500 VFR points.');
- if(new Set([...Object.keys(directory.vfrPoints),...names]).size>500)throw Error('The shared VFR directory supports up to 500 points.');
+   if(number>400)throw Error('Import up to 400 VFR points at once. Split larger lists into batches.');
+   names.add(r.name);records.push(r);cursor=pairs.lastIndex;
+  }catch(error){throw Error('Point '+number+' (line '+line+'): '+error.message)}
+ }
+ const tail=source.slice(cursor).trim();
+ if(!records.length||tail&&!/^VFR$/.test(tail))throw Error('Incomplete VFR data. Use NAME S06 15\'58" E106 47\'08". Points may be on separate lines or in one paragraph.');
+ if(new Set([...Object.keys(directory.vfrPoints),...names]).size>500)throw Error('The shared VFR directory supports up to 500 points. Remove unused points before importing.');
  return records;
 };
 function previewBulk(){

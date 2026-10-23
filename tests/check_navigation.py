@@ -167,6 +167,7 @@ GOLFI S06 16'43" E106 38'59" """
         result=page.evaluate("""async text=>{
             const before=testWrites.length;
             const good=parseVFRBulkInput(text);
+            if(JSON.stringify(parseVFRBulkInput(text.replace(/\\s*\\n\\s*/g,' ')))!==JSON.stringify(good))throw Error('Single-paragraph import differs from multiline import');
             if(good.length!==6||good[0].name!=='PIMAL'||Math.abs(good[0].lat-(-6-15/60-58/3600))>1e-9||Math.abs(good[0].lon-(106+47/60+8/3600))>1e-9)throw Error('Bulk DMS parsing incorrect');
             window.TWAAdminVerified=false;if(await importVFRBulkInput()||testWrites.length!==before)throw Error('Unauthorized bulk import');
             window.TWAAdminVerified=true;
@@ -192,7 +193,7 @@ ABEAM JAMBI S01 41'25" E103 34'42" VFR
 ABEAM JAPURA S00 23'26" E102 17'25" VFR
 SCC S06 33'32" E106 50'53" VFR
 SENTUL OPEN AREA S06 33'41" E106 51'00" VFR"""
-        page.locator("#navVfrBulkInput").fill(extended_text)
+        page.locator("#navVfrBulkInput").fill(extended_text.replace("\n"," "))
         assert page.locator("#navVfrBulkPreview tbody tr").count()==8
         page.locator("#navVfrBulkSave").click()
         page.wait_for_function("!!routePointMatch('SENTUL OPEN AREA')")
@@ -254,6 +255,32 @@ SENTUL OPEN AREA S06 33'41" E106 51'00" VFR"""
         print("NAVIGATION_REMOVAL_CHECKS",json.dumps(result))
         other.evaluate("data=>applyNavigationDirectory(data.navigationDirectory)",page.evaluate("testPublicSettings"))
         assert other.evaluate("!airportMatch('ZQA')&&!routePointMatch('PIMOL')")
+
+        page.evaluate("showPage('admin')")
+        batch_400="\n".join(f"TESTVFR{i:03d} S06 15'58\" E106 47'08\"" for i in range(400))
+        page.locator("#navVfrBulkInput").fill(batch_400)
+        assert page.locator("#navVfrBulkPreview tbody tr").count()==400
+        result=page.evaluate("""async text=>{
+            const input=document.getElementById('navVfrBulkInput'),before=testWrites.length,existing=JSON.stringify(getNavigationDirectory());
+            const reject=async value=>{
+                input.value=value;
+                if(await importVFRBulkInput()||testWrites.length!==before||JSON.stringify(getNavigationDirectory())!==existing)throw Error('Invalid batch changed directory');
+            };
+            await reject(text+'\\nTESTVFR400 S06 15\\'58" E106 47\\'08"');
+            await reject(text+'\\nBROKEN S06 15\\'58"');
+            await reject(text+'\\nTESTVFR000 S06 15\\'58" E106 47\\'08"');
+            if(parseVFRBulkInput(text.replace(/\\n/g,' ')).length!==400)throw Error('400-point paragraph not parsed');
+            input.value=text;input.dispatchEvent(new Event('input',{bubbles:true}));
+            return {before,existing};
+        }""",batch_400)
+        page.locator("#navVfrBulkSave").click()
+        page.wait_for_function("!!routePointMatch('TESTVFR399')")
+        assert page.evaluate("before=>testWrites.length===before+1",result["before"])
+        assert page.evaluate("!!routePointMatch('ABEAM PLM')&&!!routePointMatch('TESTVFR000')&&!!routePointMatch('TESTVFR399')")
+        other.evaluate("data=>applyNavigationDirectory(data.navigationDirectory)",page.evaluate("testPublicSettings"))
+        assert other.evaluate("!!routePointMatch('TESTVFR000')&&!!routePointMatch('TESTVFR399')")
+        print("VFR_400_POINT_IMPORT_CHECKS passed: multiline, single paragraph, atomic write, preserved data, other device, rejected 401 and incomplete data")
+
         assert not errors, errors
         page.evaluate("showPage('admin');document.getElementById('navigationDataAdmin').scrollIntoView()")
         Path("work").mkdir(exist_ok=True)
