@@ -73,6 +73,7 @@ window.showPriceDetails=function(index){
  const name=aircraft[index]?.[0];if(!name)return;
  const check=checkRunwayCompatibility(name);
  if(check.applicable&&check.airports.length&&!check.eligible){showNotice(name,check);return}
+ if(el('plane').value!==name){el('plane').value=name;window.updatePlaneCosts()}
  el('modalBookButton').hidden=false;show(index);
  if(check.applicable&&check.airports.length)el('priceModalContent').insertAdjacentHTML('beforeend',details(check));
 };
