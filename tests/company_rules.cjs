@@ -34,6 +34,12 @@ const {doc,setDoc,getDoc,updateDoc,serverTimestamp}=require('firebase/firestore'
   await assertSucceeds(setDoc(settings,{navigationDirectory:{vfrPoints:{PIMOL:null}}},{mergeFields:['navigationDirectory.vfrPoints.PIMOL']}));
   const deleted=(await assertSucceeds(getDoc(doc(guest,'publicSettings','bookingApp')))).data().navigationDirectory;
   if(deleted.vfrPoints.PIMOL!==null||!deleted.vfrPoints['ABEAM PLM']||!deleted.airports.ZQA)throw Error('VFR deletion did not preserve other entries');
+  const bulk400=Object.fromEntries(Array.from({length:400},(_,i)=>{const name='TESTVFR'+String(i).padStart(3,'0');return [name,{name,lat:-6.2661,lon:106.7856}]}));
+  const bulkFields=Object.keys(bulk400).map(name=>'navigationDirectory.vfrPoints.'+name);
+  await assertSucceeds(setDoc(settings,{navigationDirectory:{vfrPoints:bulk400}},{mergeFields:bulkFields}));
+  await assertFails(setDoc(doc(visitor,'publicSettings','bookingApp'),{navigationDirectory:{vfrPoints:bulk400}},{mergeFields:bulkFields}));
+  const saved400=(await assertSucceeds(getDoc(doc(guest,'publicSettings','bookingApp')))).data().navigationDirectory;
+  if(!saved400.vfrPoints.TESTVFR000||!saved400.vfrPoints.TESTVFR399||!saved400.vfrPoints['ABEAM PLM']||!saved400.airports.ZQA)throw Error('400-point batch did not preserve shared data');
   console.log('NAVIGATION_FIRESTORE_CHECKS passed');
 
   await assertSucceeds(updateDoc(doc(root,'publicSettings','bookingApp'),{'customization.companyName':'Allowed'}));
