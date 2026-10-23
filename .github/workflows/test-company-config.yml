@@ -6,6 +6,7 @@ on:
       - 'customization.js'
       - 'multicity.js'
       - 'runways.js'
+      - 'navigation.js'
       - 'app-config.js'
       - 'firestore.rules'
       - 'sw.js'
@@ -38,6 +39,7 @@ jobs:
         run: |
           python scripts/build_pwa.py
           python tests/check_company_builder.py
+          python tests/check_navigation.py
       - name: Firestore role tests
         run: |
           npm install --no-save firebase@11.10.0 @firebase/rules-unit-testing@4.0.1 firebase-tools@13.35.1
@@ -50,4 +52,5 @@ jobs:
           path: |
             work/company-builder.png
             work/multi-city-mobile.png
+            work/navigation-admin.png
             firestore-debug.log
