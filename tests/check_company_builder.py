@@ -22,6 +22,15 @@ try:
         assert page.get_by_text("Aircraft reservation holds expire after 5 minutes.",exact=True).count()==1
         page.wait_for_function("""async()=>{const link=document.querySelector('link[rel="icon"]');const img=new Image();img.src=link.href;await img.decode();return img.naturalWidth===32&&img.naturalHeight===32}""")
         print("DEFAULT_FAVICON_CHECK passed")
+        assert page.title()=="TRANSWISATA ONLINE BOOKING"
+        assert page.locator("#appTagline").inner_text()=="PRIMA AVIATION"
+        assert page.evaluate("getCurrentCompanyConfig().appName")=="TRANSWISATA PRIMA AVIATION"
+        page.evaluate("""()=>{
+            const legacy=getCurrentCompanyConfig();delete legacy.webTitle;legacy.appName='Transwisata Private Aviation';legacy.tagline='PRIVATE AVIATION';
+            applyCompanyCustomization(legacy);
+            if(document.title!=='TRANSWISATA ONLINE BOOKING'||getCurrentCompanyConfig().appName!=='TRANSWISATA PRIMA AVIATION'||document.getElementById('appTagline').textContent!=='PRIMA AVIATION')throw Error('Saved legacy branding overrode requested names');
+        }""")
+        print("WEB_TITLE_APP_NAME_CHECK passed")
 
 
         result=page.evaluate("""()=>{
@@ -278,11 +287,11 @@ try:
         result=page.evaluate("""()=>{
             const cfg=getCurrentCompanyConfig();
             const canvas=document.createElement('canvas');canvas.width=canvas.height=64;canvas.getContext('2d').fillRect(0,0,64,64);cfg.iconData=canvas.toDataURL('image/jpeg');
-            cfg.companyName='Demo Air';cfg.appName='Demo Air Charter';cfg.heroTitle='Company-configured heading';cfg.primary='#234567';
+            cfg.companyName='Demo Air';cfg.appName='Demo Air Charter';cfg.webTitle='Demo Air Online Booking';cfg.heroTitle='Company-configured heading';cfg.primary='#234567';
             cfg.fleet.push({name:'Demo Helicopter',registration:'ZZ-TEST',description:'Configured aircraft',type:'helicopter',planningSpeed:100,rateUSD:123,burnLiters:45,cruiseSpeed:105,endurance:2,seats:4,range:200,dailyHours:4,maxLegMinutes:90,active:true});
             const valid=validateCompanyConfig(cfg);
             applyCompanyCustomization(valid,{preview:true});
-            const checks={brand:document.getElementById('appCompanyName').textContent==='Demo Air',title:document.title==='Demo Air Charter',newAircraft:aircraft.length===6,helicopter:isHelicopter('Demo Helicopter'),legLimit:helicopterMaxLegHours('Demo Helicopter')===1.5,rate:assumptions['Demo Helicopter'].rate===123};
+            const checks={brand:document.getElementById('appCompanyName').textContent==='Demo Air',title:document.title==='Demo Air Online Booking',newAircraft:aircraft.length===6,helicopter:isHelicopter('Demo Helicopter'),legLimit:helicopterMaxLegHours('Demo Helicopter')===1.5,rate:assumptions['Demo Helicopter'].rate===123};
             let duplicateBlocked=false;try{validateCompanyConfig({...cfg,fleet:[...cfg.fleet,cfg.fleet[0]]})}catch{duplicateBlocked=true}
             checks.duplicateBlocked=duplicateBlocked;
             let injectionBlocked=false;try{validateCompanyConfig({...cfg,fleet:[{...cfg.fleet[0],name:'<img src=x>'}]})}catch{injectionBlocked=true}
