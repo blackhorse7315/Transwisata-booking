@@ -1165,7 +1165,7 @@ window.TWAFirebase={
  },
  saveVFRPoints:async(records)=>{
   if(!window.TWAAdminVerified)throw Error('Admin sign-in required.');
-  if(!Array.isArray(records)||records.length<1||records.length>500)throw Error('Enter 1–500 VFR points.');
+  if(!Array.isArray(records)||records.length<1||records.length>400)throw Error('Enter 1–400 VFR points.');
   const points={},fields=[];
   for(const record of records){
    if(typeof record.name!=='string'||record.name.length<2||record.name.length>80||!/^[A-Z][A-Z0-9]*(?: [A-Z0-9]+)*$/.test(record.name)||typeof record.lat!=='number'||typeof record.lon!=='number'||!Number.isFinite(record.lat)||!Number.isFinite(record.lon)||Math.abs(record.lat)>90||Math.abs(record.lon)>180||points[record.name])throw Error('Invalid or duplicate VFR point.');
