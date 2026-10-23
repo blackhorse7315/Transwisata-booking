@@ -137,7 +137,7 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
 <h3>Helicopter Route Management</h3>
 <p class="small">Save preferred airport and registered VFR sequences for helicopters. Saved routes override automatic refuel routing. Admin routes can include sectors longer than 2h 15m. Daily airborne limits: Agusta 6 hours; Bell 412 7 hours. Additional sectors move to the next day when needed. A single sector cannot exceed the daily limit. The 2h 15m limit applies only to automatic refuel routing. Round trips return through the same airports and VFR points in reverse order. Fuel supply and operational approval must be confirmed separately.</p>
 <div class="costgrid"><div><label for="heliRouteAircraft">Helicopter</label><select id="heliRouteAircraft"><option value="Bell 412EP">Bell 412</option><option value="AW109S Grand">Agusta (AW109S Grand)</option><option value="both">Bell 412 &amp; Agusta</option></select></div><div><label for="heliRouteFrom">From</label><input id="heliRouteFrom" placeholder="City / IATA / ICAO, e.g. HLP" autocomplete="off" aria-autocomplete="list"></div><div><label for="heliRouteTo">To</label><input id="heliRouteTo" placeholder="City / IATA / ICAO, e.g. PKU" autocomplete="off" aria-autocomplete="list"></div><div><label for="heliRouteSequence">Route · airports / VFR points</label><input id="heliRouteSequence" placeholder="e.g. HLP-PIMOL-GOLPI-ERANG-MERAK-GUSAN-TKG" autocomplete="off"><small class="small">From and To are included automatically when missing. Type airport codes or registered VFR names in flight order. VFR points are fly-over waypoints, not refuel stops.</small></div><div><label for="heliRouteReverse">Also save reverse search route</label><input id="heliRouteReverse" type="checkbox" style="width:auto"> Save To → From with reversed routing</div></div>
-<div class="actions"><button class="btn" type="button" onclick="saveHelicopterRoute()">Save Helicopter Route</button></div><p id="heliRouteStatus" class="small" role="status" aria-live="polite"></p><div id="heliRoutesAdmin" style="overflow:auto"></div>
+<div class="actions"><button class="btn" type="button" id="saveHeliRouteButton" onclick="saveHelicopterRoute()">Save Helicopter Route</button><button class="btn secondary" type="button" id="cancelHeliRouteEdit" onclick="cancelHelicopterRouteEdit()" hidden>Cancel Edit</button></div><p id="heliRouteStatus" class="small" role="status" aria-live="polite"></p><div id="heliRoutesAdmin" style="overflow:auto"></div>
 <h3>Airport Fuel Prices · Pertamina &amp; International</h3>
 <p class="small">Store Jet A-1 / Avtur prices per liter by airport. Indonesia: upload a Pertamina price list. International: enter prices manually or import PDF / CSV / TXT. Review the extracted airport, currency and price column before saving. Include applicable supplier charges/taxes in the entered price. Import does not verify the supplier document.</p>
 <div class="costgrid">
@@ -407,12 +407,41 @@ function selectedRoutePlan(start,end,name){
  if(!Array.isArray(saved.codes)||saved.codes[0]!==start[0]||saved.codes[saved.codes.length-1]!==end[0])return {ok:false,points:[start,end],reason:'Saved route endpoints are invalid. Ask Admin to update the route.',maxNM:assumptions[name].speed*helicopterMaxLegHours(name),lim:planningLimits[name]};
  return planHelicopterPoints(saved.codes.map(window.routePointMatch||airportMatch),name);
 }
+let helicopterRouteEdit=null;
 function drawHelicopterRoutesAdmin(){
  const target=document.getElementById('heliRoutesAdmin');if(!target)return;
  const rows=Object.entries(getHelicopterRoutes()).filter(([,r])=>r&&Array.isArray(r.codes));
- target.innerHTML='<table><thead><tr><th>Helicopter</th><th>Search route</th><th>Saved routing</th><th>Action</th></tr></thead><tbody>'+rows.map(([key,r],i)=>'<tr><td>'+esc(r.aircraft)+'</td><td>'+esc(r.codes[0])+' → '+esc(r.codes[r.codes.length-1])+'</td><td>'+esc(r.codes.join(' → '))+'</td><td><button type="button" class="btn secondary" id="removeHeliRoute'+i+'">Delete</button></td></tr>').join('')+(rows.length?'':'<tr><td colspan="4">No saved helicopter routes. Automatic refuel routing applies.</td></tr>')+'</tbody></table>';
- rows.forEach(([key],i)=>document.getElementById('removeHeliRoute'+i).onclick=()=>deleteHelicopterRoute(key));
+ target.innerHTML='<table><thead><tr><th>Helicopter</th><th>Search route</th><th>Saved routing</th><th>Action</th></tr></thead><tbody>'+rows.map(([key,r],i)=>'<tr'+(key===helicopterRouteEdit?.key?' style="background:#eef6ff"':'')+'><td>'+esc(r.aircraft)+'</td><td>'+esc(r.codes[0])+' → '+esc(r.codes[r.codes.length-1])+'</td><td>'+esc(r.codes.join(' → '))+'</td><td><button type="button" class="btn secondary" id="editHeliRoute'+i+'">Edit</button> <button type="button" class="btn secondary" id="removeHeliRoute'+i+'">Delete</button></td></tr>').join('')+(rows.length?'':'<tr><td colspan="4">No saved helicopter routes. Automatic refuel routing applies.</td></tr>')+'</tbody></table>';
+ rows.forEach(([key],i)=>{document.getElementById('editHeliRoute'+i).onclick=()=>editHelicopterRoute(key);document.getElementById('removeHeliRoute'+i).onclick=()=>deleteHelicopterRoute(key)});
 }
+function editHelicopterRoute(key){
+ const status=document.getElementById('heliRouteStatus');
+ if(!window.TWAAdminVerified){status.textContent='Admin login required.';return false}
+ const route=getHelicopterRoutes()[key],selector=document.getElementById('heliRouteAircraft');
+ if(!route||!Array.isArray(route.codes)||route.codes.length<2){status.textContent='This route is no longer available. Refresh the list.';return false}
+ if(!Array.from(selector.options).some(option=>option.value===route.aircraft)){status.textContent='This helicopter is no longer in the active fleet. Update the fleet first.';return false}
+ helicopterRouteEdit={key,original:JSON.stringify(route),aircraft:route.aircraft,codes:[...route.codes]};
+ selector.value=route.aircraft;
+ document.getElementById('heliRouteFrom').value=route.codes[0];
+ document.getElementById('heliRouteTo').value=route.codes.at(-1);
+ document.getElementById('heliRouteSequence').value=route.codes.join('-');
+ document.getElementById('heliRouteReverse').checked=false;
+ document.getElementById('saveHeliRouteButton').textContent='Update Helicopter Route';
+ document.getElementById('cancelHeliRouteEdit').hidden=false;
+ status.textContent='Editing '+route.aircraft+' · '+route.codes[0]+' → '+route.codes.at(-1)+'. The reverse route changes only if Also save reverse search route is checked.';
+ drawHelicopterRoutesAdmin();
+ document.getElementById('heliRouteSequence').focus();
+ document.getElementById('heliRouteAircraft').scrollIntoView({behavior:'smooth',block:'center'});
+ return true;
+}
+function cancelHelicopterRouteEdit(clearForm=true){
+ helicopterRouteEdit=null;
+ document.getElementById('saveHeliRouteButton').textContent='Save Helicopter Route';
+ document.getElementById('cancelHeliRouteEdit').hidden=true;
+ if(clearForm){for(const id of ['heliRouteFrom','heliRouteTo','heliRouteSequence'])document.getElementById(id).value='';document.getElementById('heliRouteReverse').checked=false;document.getElementById('heliRouteStatus').textContent='Edit cancelled. No changes were saved.'}
+ drawHelicopterRoutesAdmin();
+}
+
 function normalizeHelicopterRoute(fromValue,toValue,routeValue){
  const start=airportMatch(fromValue),end=airportMatch(toValue);
  if(!start||!end||start[0]===end[0])throw Error('Choose distinct valid From and To airports.');
@@ -426,24 +455,42 @@ function normalizeHelicopterRoute(fromValue,toValue,routeValue){
 
 async function saveHelicopterRoute(){
  const status=document.getElementById('heliRouteStatus');
- if(!window.TWAAdminVerified||!window.TWAFirebase){status.textContent='Admin login required.';return}
+ if(!window.TWAAdminVerified||!window.TWAFirebase){status.textContent='Admin login required.';return false}
+ const editing=helicopterRouteEdit,current=getHelicopterRoutes();
+ if(editing&&JSON.stringify(current[editing.key])!==editing.original){status.textContent='This route has changed or been deleted on another device. Cancel Edit and open the current route again.';return false}
  let points;
- try{points=normalizeHelicopterRoute(document.getElementById('heliRouteFrom').value,document.getElementById('heliRouteTo').value,document.getElementById('heliRouteSequence').value)}catch(e){status.textContent=e.message;return}
- const choice=document.getElementById('heliRouteAircraft').value,names=choice==='both'?aircraft.map(a=>a[0]).filter(isHelicopter):[choice],next={...getHelicopterRoutes()};
+ try{points=normalizeHelicopterRoute(document.getElementById('heliRouteFrom').value,document.getElementById('heliRouteTo').value,document.getElementById('heliRouteSequence').value)}catch(e){status.textContent=e.message;return false}
+ const choice=document.getElementById('heliRouteAircraft').value,names=choice==='both'?aircraft.map(a=>a[0]).filter(isHelicopter):[choice],reverse=document.getElementById('heliRouteReverse').checked,next={...current},updates=[];
  for(const name of names){
-  if(!isHelicopter(name)){status.textContent='Select a supported helicopter.';return}
-  const plan=planHelicopterPoints(points,name);if(!plan.ok){status.textContent=name+': '+plan.reason;return}
-  const sequences=[points.map(p=>p[0])];if(document.getElementById('heliRouteReverse').checked)sequences.push([...sequences[0]].reverse());
-  for(const codes of sequences)next[helicopterRouteKey(name,codes[0],codes[codes.length-1])]={aircraft:name,codes};
+  if(!isHelicopter(name)){status.textContent='Select a supported helicopter.';return false}
+  const plan=planHelicopterPoints(points,name);if(!plan.ok){status.textContent=name+': '+plan.reason;return false}
+  const sequences=[points.map(p=>p[0])];if(reverse)sequences.push([...sequences[0]].reverse());
+  for(const codes of sequences)updates.push({key:helicopterRouteKey(name,codes[0],codes.at(-1)),value:{aircraft:name,codes}});
  }
- status.textContent='Saving route to Firebase…';
- try{await window.TWAFirebase.saveConfig('helicopterRoutes',next);tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));drawHelicopterRoutesAdmin();calculateEstimate();document.getElementById('heliRouteSequence').value=points.map(p=>p[0]).join('-');status.textContent='Saved '+points[0][0]+' → '+points[points.length-1][0]+': '+points.map(p=>p[0]).join(' → ')}catch(e){status.textContent='Route save failed: '+e.message}
+ const oldReverse=editing?helicopterRouteKey(editing.aircraft,editing.codes.at(-1),editing.codes[0]):null;
+ if(editing){
+  const conflict=updates.find(({key})=>current[key]&&key!==editing.key&&!(reverse&&key===oldReverse)&&choice!=='both');
+  if(conflict){status.textContent='Another saved route already uses that helicopter and From/To pair. Edit that row instead, or cancel this edit.';return false}
+  if(!updates.some(update=>update.key===editing.key))next[editing.key]=null;
+  if(reverse&&current[oldReverse]&&!updates.some(update=>update.key===oldReverse))next[oldReverse]=null;
+ }
+ for(const update of updates)next[update.key]=update.value;
+ status.textContent=editing?'Updating route in Firebase…':'Saving route to Firebase…';
+ try{
+  await window.TWAFirebase.saveConfig('helicopterRoutes',next);
+  tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));
+  if(editing)cancelHelicopterRouteEdit(false);else drawHelicopterRoutesAdmin();
+  calculateEstimate();document.getElementById('heliRouteSequence').value=points.map(p=>p[0]).join('-');
+  status.textContent=(editing?'Updated ':'Saved ')+points[0][0]+' → '+points.at(-1)[0]+': '+points.map(p=>p[0]).join(' → ');
+  return true;
+ }catch(e){status.textContent='Route save failed: '+e.message;return false}
 }
+
 async function deleteHelicopterRoute(key){
  if(!window.TWAAdminVerified||!window.TWAFirebase)return;
  const status=document.getElementById('heliRouteStatus'),next={...getHelicopterRoutes(),[key]:null};
  status.textContent='Deleting route from Firebase…';
- try{await window.TWAFirebase.saveConfig('helicopterRoutes',next);tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));drawHelicopterRoutesAdmin();calculateEstimate();status.textContent='Route deleted. Automatic refuel routing now applies.'}catch(e){status.textContent='Route deletion failed: '+e.message}
+ try{await window.TWAFirebase.saveConfig('helicopterRoutes',next);tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(next));if(helicopterRouteEdit?.key===key)cancelHelicopterRouteEdit(false);else drawHelicopterRoutesAdmin();calculateEstimate();status.textContent='Route deleted. Automatic refuel routing now applies.'}catch(e){status.textContent='Route deletion failed: '+e.message}
 }
 
 
