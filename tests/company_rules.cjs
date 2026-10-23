@@ -19,6 +19,14 @@ const {doc,setDoc,getDoc,updateDoc,serverTimestamp}=require('firebase/firestore'
   await assertFails(updateDoc(doc(admin,'publicSettings','bookingApp'),{customization:{companyName:'Forbidden'}}));
   await assertFails(updateDoc(doc(visitor,'publicSettings','bookingApp'),{customization:{companyName:'Forbidden'}}));
   await assertSucceeds(updateDoc(doc(admin,'publicSettings','bookingApp'),{costs:{fuelPrice:5}}));
+  const settings=doc(admin,'publicSettings','bookingApp');
+  await assertSucceeds(setDoc(settings,{navigationDirectory:{airports:{ZQA:{name:'Fixture Airport',city:'Fixture City',iata:'ZQA',icao:'WAQA',runwayM:1200,lat:-6.5,lon:106.75}}}},{mergeFields:['navigationDirectory.airports.ZQA']}));
+  await assertSucceeds(setDoc(settings,{navigationDirectory:{vfrPoints:{PIMOL:{name:'PIMOL',lat:-6.2,lon:106.6}}}},{mergeFields:['navigationDirectory.vfrPoints.PIMOL']}));
+  await assertFails(setDoc(doc(visitor,'publicSettings','bookingApp'),{navigationDirectory:{vfrPoints:{BADFIX:{name:'BADFIX',lat:0,lon:0}}}},{mergeFields:['navigationDirectory.vfrPoints.BADFIX']}));
+  const publicDirectory=(await assertSucceeds(getDoc(doc(guest,'publicSettings','bookingApp')))).data().navigationDirectory;
+  if(!publicDirectory.airports.ZQA||!publicDirectory.vfrPoints.PIMOL||publicDirectory.vfrPoints.BADFIX)throw Error('Navigation fields or access not preserved');
+  console.log('NAVIGATION_FIRESTORE_CHECKS passed');
+
   await assertSucceeds(updateDoc(doc(root,'publicSettings','bookingApp'),{'customization.companyName':'Allowed'}));
   const hold={plane:'Demo Helicopter',owner:'visitor-a',status:'pending',expires:Date.now()+300000,updatedAt:serverTimestamp()};
   await assertSucceeds(setDoc(doc(visitor,'fleetHolds','ZZ-TEST'),hold));
