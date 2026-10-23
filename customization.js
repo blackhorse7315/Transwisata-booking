@@ -4,42 +4,43 @@
 'use strict';
 const el=id=>document.getElementById(id),clone=x=>JSON.parse(JSON.stringify(x));
 const firebaseKeys=['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId','measurementId'];
-const textFields={companyName:'Nama perusahaan',appName:'Nama aplikasi / instalasi',webTitle:'Judul tab web',tagline:'Tagline',eyebrow:'Teks di atas judul',heroTitle:'Judul halaman',heroText:'Deskripsi halaman',fleetTitle:'Judul daftar armada',fleetIntro:'Pengantar daftar armada',fleetNote:'Catatan operasional',footer:'Footer',bookLabel:'Menu booking',trackLabel:'Menu tracking',adminLabel:'Menu Admin',installLabel:'Tombol instalasi'};
-const colorFields={primary:'Warna utama',accent:'Warna tombol',background:'Latar halaman',text:'Warna teks'};
+const textFields={companyName:'Company name',appName:'Application / installation name',webTitle:'Browser tab title',tagline:'Tagline',eyebrow:'Heading eyebrow text',heroTitle:'Page heading',heroText:'Page description',fleetTitle:'Fleet heading',fleetIntro:'Fleet introduction',fleetNote:'Operational note',footer:'Footer',bookLabel:'Booking menu label',trackLabel:'Tracking menu label',adminLabel:'Admin menu label',installLabel:'Install button label'};
+const colorFields={primary:'Primary color',accent:'Button color',background:'Page background',text:'Text color'};
 const defaultFleet=aircraft.map(a=>({name:a[0],description:a[1],registration:a[2],type:isHelicopter(a[0])?'helicopter':'fixed',planningSpeed:assumptions[a[0]].speed,rateUSD:assumptions[a[0]].rate,burnLiters:assumptions[a[0]].burn*3.785411784,cruiseSpeed:fleetSpecs()[a[0]].speed,endurance:fleetSpecs()[a[0]].endurance,seats:fleetSpecs()[a[0]].seats,range:fleetSpecs()[a[0]].range,dailyHours:planningLimits[a[0]].daily,minimumRunwayM:defaultMinimumRunway(a[0]),maxLegMinutes:135,active:true}));
-const defaults={version:1,companyName:'TRANSWISATA',appName:'TRANSWISATA PRIMA AVIATION',webTitle:'TRANSWISATA ONLINE BOOKING',tagline:'PRIMA AVIATION',eyebrow:'EXCLUSIVE AIR CHARTER',heroTitle:'Your Journey. Our Commitment.',heroText:'Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.',fleetTitle:'Aircraft & Charter Estimate',fleetIntro:'Select an aircraft to calculate the estimate for your itinerary.',fleetNote:'Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.',footer:'© 2026 PT Transwisata Prima Aviation · No payment collected',bookLabel:'Book Flight',trackLabel:'Track Booking',adminLabel:'Admin',installLabel:'Install Aplikasi',primary:'#0b1b30',accent:'#d5a95c',background:'#f3f6fa',text:'#15243a',logoData:'',iconData:'',fleet:defaultFleet};
+const defaults={version:1,companyName:'TRANSWISATA',appName:'TRANSWISATA PRIMA AVIATION',webTitle:'TRANSWISATA ONLINE BOOKING',tagline:'PRIMA AVIATION',eyebrow:'EXCLUSIVE AIR CHARTER',heroTitle:'Your Journey. Our Commitment.',heroText:'Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.',fleetTitle:'Aircraft & Charter Estimate',fleetIntro:'Select an aircraft to calculate the estimate for your itinerary.',fleetNote:'Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.',footer:'© 2026 PT Transwisata Prima Aviation · No payment collected',bookLabel:'Book Flight',trackLabel:'Track Booking',adminLabel:'Admin',installLabel:'Install App',primary:'#0b1b30',accent:'#d5a95c',background:'#f3f6fa',text:'#15243a',logoData:'',iconData:'',fleet:defaultFleet};
 window.TWACustomFleet=clone(defaultFleet);
 let liveConfig=clone(defaults),draftFleet=[],logoDraft='',iconDraft='';
 const message=text=>{el('saStatus').textContent=text};
 function validImage(value){return value===''||/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)&&value.length<=85000}
 function validateConfig(input){
- if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Konfigurasi tidak valid.');
+ if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Invalid configuration.');
  const legacyName=/^transwisata private aviation$/i.test(String(input.appName||'').trim().replace(/\s+/g,' '));
  input={...input,webTitle:input.webTitle??(legacyName?defaults.webTitle:input.appName)};
  const out={version:1};
- for(const key of Object.keys(textFields)){if(typeof input[key]!=='string'||input[key].length>1500)throw Error('Teks tidak valid: '+key);out[key]=input[key]}
+ for(const key of Object.keys(textFields)){if(typeof input[key]!=='string'||input[key].length>1500)throw Error('Invalid text: '+key);out[key]=input[key]}
+ if(out.installLabel==='Install Aplikasi')out.installLabel=defaults.installLabel;
  if(legacyName)out.appName=defaults.appName;
  if(/^transwisata$/i.test(out.companyName.trim())&&/^private aviation$/i.test(out.tagline.trim()))out.tagline=defaults.tagline;
  if(out.fleetTitle==='Compare Aircraft & Prices')out.fleetTitle='Aircraft & Charter Estimate';
  if(out.fleetIntro==='Prices update automatically from your route and travel details. Tap View Price Details to see the breakdown.')out.fleetIntro='Select an aircraft to calculate the estimate for your itinerary.';
- for(const key of Object.keys(colorFields)){if(!/^#[0-9a-f]{6}$/i.test(input[key]||''))throw Error('Warna tidak valid: '+key);out[key]=input[key]}
- for(const key of ['logoData','iconData']){if(!validImage(input[key]||''))throw Error('Logo/ikon tidak valid atau terlalu besar.');out[key]=input[key]||''}
- if(!Array.isArray(input.fleet)||input.fleet.length<1||input.fleet.length>40)throw Error('Isi 1–40 pesawat.');
+ for(const key of Object.keys(colorFields)){if(!/^#[0-9a-f]{6}$/i.test(input[key]||''))throw Error('Invalid color: '+key);out[key]=input[key]}
+ for(const key of ['logoData','iconData']){if(!validImage(input[key]||''))throw Error('The logo or icon is invalid or too large.');out[key]=input[key]||''}
+ if(!Array.isArray(input.fleet)||input.fleet.length<1||input.fleet.length>40)throw Error('Enter 1–40 aircraft.');
  const names=new Set(),regs=new Set();
  out.fleet=input.fleet.map(row=>{
   const r={name:String(row.name||'').trim(),description:String(row.description||'').trim(),registration:String(row.registration||'').trim().toUpperCase(),type:row.type,active:row.active!==false};
-  if(!r.name||r.name.length>80||!r.name.match(/^[\p{L}\p{N} ._()+\/-]+$/u)||r.description.length>250||!r.registration.match(/^[A-Z0-9][A-Z0-9-]{1,19}$/)||r.name==='To be advised'||['__proto__','constructor','prototype'].includes(r.name.toLowerCase())||names.has(r.name.toLowerCase())||regs.has(r.registration)||!['helicopter','fixed'].includes(r.type))throw Error('Nama/registrasi pesawat harus unik dan valid.');
+  if(!r.name||r.name.length>80||!r.name.match(/^[\p{L}\p{N} ._()+\/-]+$/u)||r.description.length>250||!r.registration.match(/^[A-Z0-9][A-Z0-9-]{1,19}$/)||r.name==='To be advised'||['__proto__','constructor','prototype'].includes(r.name.toLowerCase())||names.has(r.name.toLowerCase())||regs.has(r.registration)||!['helicopter','fixed'].includes(r.type))throw Error('Aircraft names and registrations must be valid and unique.');
   names.add(r.name.toLowerCase());regs.add(r.registration);
-  r.minimumRunwayM=Number(row.minimumRunwayM??defaultMinimumRunway(r.name));if(!Number.isFinite(r.minimumRunwayM)||r.minimumRunwayM<0||r.minimumRunwayM>20000)throw Error('Minimum runway tidak valid.');
+  r.minimumRunwayM=Number(row.minimumRunwayM??defaultMinimumRunway(r.name));if(!Number.isFinite(r.minimumRunwayM)||r.minimumRunwayM<0||r.minimumRunwayM>20000)throw Error('Invalid minimum runway length.');
   for(const key of ['planningSpeed','rateUSD','burnLiters','cruiseSpeed','endurance','seats','range','dailyHours','maxLegMinutes']){
-   r[key]=Number(row[key]);if(!Number.isFinite(r[key])||r[key]<0||r[key]>10000000)throw Error('Angka pesawat tidak valid: '+r.name+' / '+key);
+   r[key]=Number(row[key]);if(!Number.isFinite(r[key])||r[key]<0||r[key]>10000000)throw Error('Invalid aircraft value: '+r.name+' / '+key);
   }
-  if(r.planningSpeed<=0||r.dailyHours<=0||r.maxLegMinutes<=0||!Number.isInteger(r.seats)||r.seats<1)throw Error('Kecepatan, batas harian, batas leg, dan kursi harus lebih dari nol.');
+  if(r.planningSpeed<=0||r.dailyHours<=0||r.maxLegMinutes<=0||!Number.isInteger(r.seats)||r.seats<1)throw Error('Speed, daily limits, leg limits and seat count must be greater than zero.');
   return r;
  });
- if(!out.fleet.some(r=>r.active))throw Error('Minimal satu pesawat harus aktif.');
+ if(!out.fleet.some(r=>r.active))throw Error('At least one aircraft must be active.');
  out.fleetByReg=Object.fromEntries(out.fleet.map(r=>[r.registration,{name:r.name,active:r.active}]));
- if(JSON.stringify(out).length>230000)throw Error('Konfigurasi terlalu besar. Kurangi ukuran logo atau teks.');
+ if(JSON.stringify(out).length>230000)throw Error('The configuration is too large. Reduce the logo size or text length.');
  return out;
 }
 window.validateCompanyConfig=validateConfig;
@@ -92,7 +93,7 @@ function applyFleet(config,preview=false){
  el('plane').replaceChildren(new Option('Select an aircraft',''),...next.map(r=>new Option(r.name,r.name)));
  el('plane').value=assumptions[currentPlane]?currentPlane:'';
  el('fleet').innerHTML=next.map(r=>'<article class="aircraft"><div class="art">✈</div><div class="details"><span class="pill">'+esc(r.registration)+'</span><h3>'+esc(r.name)+'</h3><p>'+esc(r.description)+'</p></div></article>').join('');
- const routeSelector=el('heliRouteAircraft');if(routeSelector){routeSelector.replaceChildren(...next.filter(r=>r.type==='helicopter').map(r=>new Option(r.name,r.name)),new Option('Semua helikopter','both'))}
+ const routeSelector=el('heliRouteAircraft');if(routeSelector){routeSelector.replaceChildren(...next.filter(r=>r.type==='helicopter').map(r=>new Option(r.name,r.name)),new Option('All helicopters','both'))}
  applyFleetPhotos();renderFleetPrices();updateHoldUI();
  if(window.TWAAdminVerified){drawAdminCosts();drawFleetSpecsAdmin();drawFleetPhotoAdmin()}
 }
@@ -113,10 +114,10 @@ window.applyCompanyCustomization=function(input,options={}){
  document.querySelector('link[rel="apple-touch-icon"]').href=icon||new URL('assets/apple-touch-icon.png',location.href).href;
  applyFleet(config,!!options.preview);
  if(!options.preview)refreshCompanyInstallManifest(config);
- const status=el('saConnection');if(status)status.textContent='Project aktif: '+(window.TWA_BOOTSTRAP?.firebase?.projectId||'default');
+ const status=el('saConnection');if(status)status.textContent='Active project: '+(window.TWA_BOOTSTRAP?.firebase?.projectId||'default');
 };
 function formMarkup(){
- return '<div id="saGate"><h2>Super Admin</h2><div class="grid"><div><label>Email</label><input id="saEmail" type="email" autocomplete="username"></div><div><label>Password</label><input id="saPassword" type="password" autocomplete="current-password"></div></div><div class="actions"><button class="btn" onclick="superAdminLogin()">Masuk Super Admin</button></div></div><div id="saWorkspace" class="hidden"><h2>Company App Builder</h2><p id="saConnection" class="small"></p><p class="small">Simpan konfigurasi untuk mengubah aplikasi aktif di semua perangkat. Ekspor paket perusahaan untuk membuat aplikasi lain dengan Firebase dan akun yang terpisah; data pelanggan tidak ikut diekspor.</p><h3>Identitas & Teks</h3><div class="costgrid">'+Object.entries(textFields).map(([key,label])=>'<label>'+label+'<input id="sa_'+key+'" maxlength="1500"></label>').join('')+'</div><h3>Warna</h3><div class="costgrid">'+Object.entries(colorFields).map(([key,label])=>'<label>'+label+'<input id="sa_'+key+'" type="color"></label>').join('')+'</div><h3>Logo & Ikon Instalasi</h3><div class="costgrid"><label>Logo perusahaan<input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadSuperAdminImage(this,\'logo\')"></label><label>Ikon aplikasi<input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadSuperAdminImage(this,\'icon\')"></label></div><div id="saImagePreview"></div><h3>Armada</h3><p class="small">Harga charter dalam USD/jam, fuel burn dalam liter/jam. Menghapus atau mengganti nama pesawat dengan hold aktif harus dilakukan setelah hold dilepas. Riwayat booking lama tetap tersimpan.</p><div id="saFleetRows"></div><button class="btn secondary" onclick="addSuperAdminAircraft()">Tambah Pesawat</button><div class="actions"><button class="btn" onclick="saveSuperAdminConfig()">Simpan Konfigurasi Aplikasi Aktif</button><button class="btn secondary" onclick="previewSuperAdminConfig()">Pratinjau</button><button class="btn secondary" onclick="cancelSuperAdminPreview()">Batalkan Pratinjau</button></div><h3>Paket Perusahaan & Firebase</h3><p class="small">Pengaturan berikut berlaku untuk paket perusahaan yang diekspor. Tidak memindahkan akun, data, atau mengganti koneksi aplikasi aktif. Gunakan Firebase Web Config publik; jangan masukkan password atau service-account key.</p><div class="costgrid">'+firebaseKeys.map(key=>'<label>'+key+'<input id="sa_fb_'+key+'"></label>').join('')+'<label>Super Admin UID pada Firebase tujuan<input id="saSuperUid"></label><label>Admin UID tujuan (pisahkan dengan koma)<input id="saAdminUids"></label></div><div class="actions"><button class="btn secondary" onclick="testCompanyFirebase()">Periksa Akses Publik Firebase Tujuan</button><button class="btn" onclick="exportCompanyApp()">Unduh Paket Aplikasi (.zip)</button><button class="btn secondary" onclick="exportSuperAdminConfig()">Ekspor Konfigurasi (.json)</button><label class="btn secondary">Impor Konfigurasi<input type="file" accept=".json,application/json" onchange="importSuperAdminConfig(this)" style="display:none"></label></div><p class="small">Sebelum dipakai, buat akun pada Firebase tujuan, aktifkan Email/Password dan Anonymous, lalu terapkan firestore.rules dari paket. Unggah isi ZIP ke hosting HTTPS; tidak perlu build. Ikon PWA yang sudah terpasang mungkin memerlukan pemasangan ulang.</p></div><p id="saStatus" role="status" aria-live="polite"></p>';
+ return '<div id="saGate"><h2>Super Admin</h2><div class="grid"><div><label>Email</label><input id="saEmail" type="email" autocomplete="username"></div><div><label>Password</label><input id="saPassword" type="password" autocomplete="current-password"></div></div><div class="actions"><button class="btn" onclick="superAdminLogin()">Super Admin Sign In</button></div></div><div id="saWorkspace" class="hidden"><h2>Company App Builder</h2><p id="saConnection" class="small"></p><p class="small">Save the configuration to update the live app across devices. Export a company package to create a separate app with its own Firebase project and accounts; customer records are excluded.</p><h3>Branding & Text</h3><div class="costgrid">'+Object.entries(textFields).map(([key,label])=>'<label>'+label+'<input id="sa_'+key+'" maxlength="1500"></label>').join('')+'</div><h3>Colors</h3><div class="costgrid">'+Object.entries(colorFields).map(([key,label])=>'<label>'+label+'<input id="sa_'+key+'" type="color"></label>').join('')+'</div><h3>Logo & Installation Icons</h3><div class="costgrid"><label>Company logo<input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadSuperAdminImage(this,\'logo\')"></label><label>Application icon<input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadSuperAdminImage(this,\'icon\')"></label></div><div id="saImagePreview"></div><h3>Fleet</h3><p class="small">Charter rates are in USD/hour and fuel burn in liters/hour. Release active holds before removing or renaming aircraft. Existing booking history is retained.</p><div id="saFleetRows"></div><button class="btn secondary" onclick="addSuperAdminAircraft()">Add Aircraft</button><div class="actions"><button class="btn" onclick="saveSuperAdminConfig()">Save Live App Configuration</button><button class="btn secondary" onclick="previewSuperAdminConfig()">Preview</button><button class="btn secondary" onclick="cancelSuperAdminPreview()">Cancel Preview</button></div><h3>Company Package & Firebase</h3><p class="small">These settings apply to the exported company package. Accounts and data are not transferred, and the live app connection is unchanged. Use the public Firebase Web Config; do not enter passwords or service-account keys.</p><div class="costgrid">'+firebaseKeys.map(key=>'<label>'+key+'<input id="sa_fb_'+key+'"></label>').join('')+'<label>Super Admin UID in the target Firebase project<input id="saSuperUid"></label><label>Target Admin UIDs (comma-separated)<input id="saAdminUids"></label></div><div class="actions"><button class="btn secondary" onclick="testCompanyFirebase()">Check Target Firebase Public Access</button><button class="btn" onclick="exportCompanyApp()">Download App Package (.zip)</button><button class="btn secondary" onclick="exportSuperAdminConfig()">Export Configuration (.json)</button><label class="btn secondary">Import Configuration<input type="file" accept=".json,application/json" onchange="importSuperAdminConfig(this)" style="display:none"></label></div><p class="small">Before use, create accounts in the target Firebase project, enable Email/Password and Anonymous authentication, and deploy the packaged firestore.rules. Upload the ZIP contents to HTTPS hosting; no build is required. Installed PWA icons may require reinstallation.</p></div><p id="saStatus" role="status" aria-live="polite"></p>';
 }
 const section=document.createElement('section');section.id='superAdmin';section.className='panel hidden';section.style.marginTop='20px';section.innerHTML=formMarkup();document.querySelector('main').append(section);
 const superNav=document.createElement('button');superNav.type='button';superNav.textContent='Super Admin';superNav.onclick=()=>showPage('superAdmin');document.querySelector('header nav').append(superNav);
@@ -126,10 +127,10 @@ window.syncSuperAdminView=function(){
 };
 window.superAdminLogin=async function(){
  try{
-  if(!window.TWAFirebase)throw Error('Firebase belum siap.');
+  if(!window.TWAFirebase)throw Error('Firebase is not ready yet.');
   const email=el('saEmail').value.trim(),password=el('saPassword').value;el('saPassword').value='';
-  await window.TWAFirebase.adminLogin(email,password);await window.TWAFirebase.verifySuperAdmin();syncSuperAdminView();message('Super Admin terverifikasi.');
- }catch(e){message('Akses Super Admin gagal: '+(e.code||e.message)+'. Pastikan UID dan Firestore Rules sudah sesuai.')}
+  await window.TWAFirebase.adminLogin(email,password);await window.TWAFirebase.verifySuperAdmin();syncSuperAdminView();message('Super Admin verified.');
+ }catch(e){message('Super Admin access failed: '+(e.code||e.message)+'. Check the UID and Firestore Rules.')}
 };
 function fillForm(config,hydrate=false){
  for(const key of [...Object.keys(textFields),...Object.keys(colorFields)])el('sa_'+key).value=config[key];
@@ -138,7 +139,7 @@ function fillForm(config,hydrate=false){
  for(const key of firebaseKeys)el('sa_fb_'+key).value=bootstrap.firebase?.[key]||'';
  el('saSuperUid').value=bootstrap.superAdminUid||'';el('saAdminUids').value=(bootstrap.adminUids||[]).join(',');
 }
-const fleetLabels={name:'Nama / model',registration:'Registrasi',description:'Deskripsi',planningSpeed:'Planning speed (kts)',rateUSD:'Charter USD/jam',burnLiters:'Fuel liter/jam',cruiseSpeed:'Cruise speed (kts)',endurance:'Endurance (HH:MM)',seats:'Kursi',range:'Max range (NM)',dailyHours:'Batas jam/hari',maxLegMinutes:'Batas leg otomatis (menit)',minimumRunwayM:'Minimum runway fixed wing (meter)'};
+const fleetLabels={name:'Name / model',registration:'Registration',description:'Description',planningSpeed:'Planning speed (kts)',rateUSD:'Charter USD/hour',burnLiters:'Fuel liters/hour',cruiseSpeed:'Cruise speed (kts)',endurance:'Endurance (HH:MM)',seats:'Seats',range:'Max range (NM)',dailyHours:'Daily flight limit (hours)',maxLegMinutes:'Automatic leg limit (minutes)',minimumRunwayM:'Fixed-wing minimum runway (meters)'};
 function captureFleetRows(){
  const rows=[];
  document.querySelectorAll('#saFleetRows .sa-fleet-row').forEach(node=>{
@@ -148,7 +149,7 @@ function captureFleetRows(){
  });return rows;
 }
 function drawFleetRows(){
- el('saFleetRows').innerHTML=draftFleet.map((r,i)=>'<div class="fleet-spec-admin-item sa-fleet-row"><h4>'+esc(r.name||'Pesawat baru')+'</h4><div class="costgrid">'+Object.entries(fleetLabels).map(([key,label])=>'<label>'+label+'<input data-field="'+key+'" '+(['name','registration','description','endurance'].includes(key)?'type="text"':'type="number" min="0" step="any"')+' value="'+esc(key==='endurance'?enduranceToHHMM(r[key]):r[key])+'"></label>').join('')+'<label>Jenis<select data-field="type"><option value="fixed" '+(r.type==='fixed'?'selected':'')+'>Fixed wing</option><option value="helicopter" '+(r.type==='helicopter'?'selected':'')+'>Helikopter</option></select></label><label>Aktif<input data-field="active" type="checkbox" '+(r.active?'checked':'')+' style="width:auto"></label></div><button type="button" class="btn secondary" data-remove="'+i+'">Hapus dari daftar</button></div>').join('');
+ el('saFleetRows').innerHTML=draftFleet.map((r,i)=>'<div class="fleet-spec-admin-item sa-fleet-row"><h4>'+esc(r.name||'New aircraft')+'</h4><div class="costgrid">'+Object.entries(fleetLabels).map(([key,label])=>'<label>'+label+'<input data-field="'+key+'" '+(['name','registration','description','endurance'].includes(key)?'type="text"':'type="number" min="0" step="any"')+' value="'+esc(key==='endurance'?enduranceToHHMM(r[key]):r[key])+'"></label>').join('')+'<label>Type<select data-field="type"><option value="fixed" '+(r.type==='fixed'?'selected':'')+'>Fixed wing</option><option value="helicopter" '+(r.type==='helicopter'?'selected':'')+'>Helicopter</option></select></label><label>Active<input data-field="active" type="checkbox" '+(r.active?'checked':'')+' style="width:auto"></label></div><button type="button" class="btn secondary" data-remove="'+i+'">Remove from List</button></div>').join('');
  el('saFleetRows').querySelectorAll('[data-remove]').forEach(button=>button.onclick=()=>{draftFleet=captureFleetRows();draftFleet.splice(Number(button.dataset.remove),1);drawFleetRows()});
 }
 window.addSuperAdminAircraft=function(){draftFleet=captureFleetRows();draftFleet.push({name:'',registration:'',description:'',type:'fixed',planningSpeed:200,rateUSD:0,burnLiters:0,cruiseSpeed:200,endurance:3,seats:6,range:600,dailyHours:8,maxLegMinutes:135,minimumRunwayM:0,active:true});drawFleetRows()};
@@ -156,56 +157,56 @@ function drawImages(){el('saImagePreview').innerHTML=[logoDraft,iconDraft].filte
 window.loadSuperAdminImage=async function(input,kind){
  const file=input.files?.[0];if(!file)return;
  try{
-  if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw Error('Pilih JPG, PNG, atau WebP.');
+  if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw Error('Select a JPG, PNG or WebP image.');
   const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)});
   const img=await imageFrom(data);let width=512,value='';
   for(let attempt=0;attempt<6;attempt++){const canvas=document.createElement('canvas');const scale=Math.min(1,width/img.width,width/img.height);canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);value=canvas.toDataURL('image/png');if(value.length<=85000)break;width=Math.round(width*.75)}
-  if(value.length>85000)throw Error('Ukuran logo masih terlalu besar.');
-  if(kind==='logo')logoDraft=value;else iconDraft=value;drawImages();message('Gambar siap. Klik Simpan atau Ekspor Paket untuk menerapkan.');
+  if(value.length>85000)throw Error('The logo is still too large.');
+  if(kind==='logo')logoDraft=value;else iconDraft=value;drawImages();message('Image ready. Click Save or Export Package to apply it.');
  }catch(e){message(e.message)}
 };
-function imageFrom(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Gambar tidak dapat dibaca.'));img.src=src})}
+function imageFrom(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('The image could not be read.'));img.src=src})}
 function collectConfig(){
  const input={fleet:captureFleetRows(),logoData:logoDraft,iconData:iconDraft};
  for(const key of [...Object.keys(textFields),...Object.keys(colorFields)])input[key]=el('sa_'+key).value;
  return validateConfig(input);
 }
-function ensureSuper(){if(!window.TWASuperAdminVerified)throw Error('Login Super Admin diperlukan.')}
+function ensureSuper(){if(!window.TWASuperAdminVerified)throw Error('Super Admin sign-in is required.')}
 function checkActiveFleetChanges(next){
- for(const [name,hold] of Object.entries(cleanHolds())){const old=aircraft.find(a=>a[0]===name);if(!old)continue;const match=next.fleet.find(r=>r.registration===old[2]&&r.name===name&&r.active);if(!match)throw Error('Lepaskan hold '+name+' sebelum menghapus, menonaktifkan, atau mengganti nama/registrasinya.')}
+ for(const [name,hold] of Object.entries(cleanHolds())){const old=aircraft.find(a=>a[0]===name);if(!old)continue;const match=next.fleet.find(r=>r.registration===old[2]&&r.name===name&&r.active);if(!match)throw Error('Release the hold for '+name+' before removing, deactivating or changing its name or registration.')}
 }
-window.previewSuperAdminConfig=function(){try{ensureSuper();const current=liveConfig,next=collectConfig();checkActiveFleetChanges(next);applyCompanyCustomization(next,{preview:true});liveConfig=current;message('Pratinjau pada perangkat ini. Klik Simpan untuk semua perangkat.')}catch(e){message(e.message)}};
-window.cancelSuperAdminPreview=function(){applyCompanyCustomization(liveConfig);syncSuperAdminView();message('Pratinjau dibatalkan.')};
+window.previewSuperAdminConfig=function(){try{ensureSuper();const current=liveConfig,next=collectConfig();checkActiveFleetChanges(next);applyCompanyCustomization(next,{preview:true});liveConfig=current;message('Preview on this device. Click Save to apply across devices.')}catch(e){message(e.message)}};
+window.cancelSuperAdminPreview=function(){applyCompanyCustomization(liveConfig);syncSuperAdminView();message('Preview cancelled.')};
 window.saveSuperAdminConfig=async function(){
- try{ensureSuper();const next=collectConfig();checkActiveFleetChanges(next);message('Menyimpan konfigurasi…');await window.TWAFirebase.saveCustomization(next);applyCompanyCustomization(next);message('Konfigurasi tersimpan dan diperbarui pada perangkat lain. Ikon instalasi mengikuti paket publikasi.')}catch(e){message('Gagal menyimpan: '+(e.code||e.message))}
+ try{ensureSuper();const next=collectConfig();checkActiveFleetChanges(next);message('Saving configuration…');await window.TWAFirebase.saveCustomization(next);applyCompanyCustomization(next);message('Configuration saved and synchronized across devices. Installation icons follow the published package.')}catch(e){message('Save failed: '+(e.code||e.message))}
 };
 function companyBootstrap(config){
  const firebase={};for(const key of firebaseKeys)firebase[key]=el('sa_fb_'+key).value.trim();
- if(!/^[a-z0-9][a-z0-9-]{3,62}$/.test(firebase.projectId)||!firebase.apiKey||!firebase.appId||!firebase.authDomain)throw Error('Lengkapi Firebase Web Config tujuan.');
- if(!/^[a-z0-9.-]+$/i.test(firebase.authDomain)||!firebase.authDomain.endsWith('.firebaseapp.com'))throw Error('Gunakan authDomain Firebase resmi.');
+ if(!/^[a-z0-9][a-z0-9-]{3,62}$/.test(firebase.projectId)||!firebase.apiKey||!firebase.appId||!firebase.authDomain)throw Error('Complete the target Firebase Web Config.');
+ if(!/^[a-z0-9.-]+$/i.test(firebase.authDomain)||!firebase.authDomain.endsWith('.firebaseapp.com'))throw Error('Use an official Firebase authDomain.');
  const superAdminUid=el('saSuperUid').value.trim(),adminUids=[...new Set(el('saAdminUids').value.split(',').map(s=>s.trim()).filter(Boolean))];
- if(!/^[A-Za-z0-9_-]{1,128}$/.test(superAdminUid)||adminUids.some(v=>!/^[A-Za-z0-9_-]{1,128}$/.test(v)))throw Error('Isi UID Super Admin dan UID Admin yang valid.');
+ if(!/^[A-Za-z0-9_-]{1,128}$/.test(superAdminUid)||adminUids.some(v=>!/^[A-Za-z0-9_-]{1,128}$/.test(v)))throw Error('Enter valid Super Admin and Admin UIDs.');
  return {firebase,superAdminUid,adminUids,initialCustomization:config};
 }
 window.testCompanyFirebase=async function(){
- try{ensureSuper();const bootstrap=companyBootstrap(collectConfig());message('Memeriksa akses publik…');await window.TWAFirebase.testCompanyFirebase(bootstrap.firebase);message('Dokumen pengaturan dapat dibaca. Akun, rules tulis, dan Anonymous Authentication masih harus diperiksa pada proyek tujuan.')}catch(e){message('Pemeriksaan gagal: '+(e.code||e.message))}
+ try{ensureSuper();const bootstrap=companyBootstrap(collectConfig());message('Checking public access…');await window.TWAFirebase.testCompanyFirebase(bootstrap.firebase);message('The settings document is readable. Verify accounts, write rules and Anonymous Authentication in the target project.')}catch(e){message('Check failed: '+(e.code||e.message))}
 };
 function download(name,data,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000)}
 window.exportSuperAdminConfig=function(){try{ensureSuper();download('company-config.json',JSON.stringify(companyBootstrap(collectConfig()),null,2),'application/json')}catch(e){message(e.message)}};
 window.importSuperAdminConfig=async function(input){
- try{ensureSuper();const file=input.files?.[0];if(!file)return;if(file.size>500000)throw Error('File konfigurasi maksimal 500 KB.');const raw=JSON.parse(await file.text()),config=validateConfig(raw.initialCustomization||raw);fillForm(config);
+ try{ensureSuper();const file=input.files?.[0];if(!file)return;if(file.size>500000)throw Error('The configuration file must not exceed 500 KB.');const raw=JSON.parse(await file.text()),config=validateConfig(raw.initialCustomization||raw);fillForm(config);
  if(raw.firebase){for(const key of firebaseKeys)el('sa_fb_'+key).value=raw.firebase[key]||'';el('saSuperUid').value=raw.superAdminUid||'';el('saAdminUids').value=(raw.adminUids||[]).join(',')}
- message('Konfigurasi diimpor ke form. Belum mengubah aplikasi aktif.');
- }catch(e){message('Impor gagal: '+e.message)}
+ message('Configuration imported into the form. The live app has not been changed.');
+ }catch(e){message('Import failed: '+e.message)}
 };
-async function readAsset(path,type='text'){const response=await fetch(new URL(path,location.href),{cache:'no-store'});if(!response.ok)throw Error('File paket gagal dibaca: '+path);return type==='blob'?response.blob():response.text()}
+async function readAsset(path,type='text'){const response=await fetch(new URL(path,location.href),{cache:'no-store'});if(!response.ok)throw Error('Could not read package file: '+path);return type==='blob'?response.blob():response.text()}
 async function pngIcon(source,size,maskable=false){
  const image=await imageFrom(source),canvas=document.createElement('canvas');canvas.width=canvas.height=size;const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,size,size);const area=size*(maskable ? 0.6 : 0.84),scale=Math.min(area/image.width,area/image.height),w=image.width*scale,h=image.height*scale;ctx.drawImage(image,(size-w)/2,(size-h)/2,w,h);return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
 }
 window.exportCompanyApp=async function(){
  try{
-  ensureSuper();const config=collectConfig(),bootstrap=companyBootstrap(config);message('Membuat paket perusahaan…');
-  if(!window.JSZip){await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';script.onload=resolve;script.onerror=()=>reject(Error('Library ZIP gagal dimuat.'));document.head.append(script)})}
+  ensureSuper();const config=collectConfig(),bootstrap=companyBootstrap(config);message('Creating company package…');
+  if(!window.JSZip){await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';script.onload=resolve;script.onerror=()=>reject(Error('The ZIP library could not be loaded.'));document.head.append(script)})}
   const zip=new window.JSZip(),[html,customJs,multiJs,runwayData,runwayJs,navJs,sw,rules,originalLogo]=await Promise.all([readAsset('index.html'),readAsset('customization.js'),readAsset('multicity.js'),readAsset('runway-data.js'),readAsset('runways.js'),readAsset('navigation.js'),readAsset('sw.js'),readAsset('firestore.rules'),readAsset('assets/logo.png','blob')]);
   zip.file('index.html',html);zip.file('customization.js',customJs);zip.file('multicity.js',multiJs);zip.file('runway-data.js',runwayData);zip.file('runways.js',runwayJs);zip.file('navigation.js',navJs);zip.file('app-config.js','window.TWA_BOOTSTRAP = '+JSON.stringify(bootstrap)+';');
   zip.file('sw.js',sw.replace(/__BUILD_VERSION__/g,Date.now().toString()).replace(/transwisata-[a-f0-9]{40}/g,'transwisata-'+Date.now()));
@@ -218,8 +219,8 @@ window.exportCompanyApp=async function(){
   zip.file('manifest.webmanifest',JSON.stringify(manifest,null,2));
   zip.file('firestore.rules',rules.replace(/function isSuperAdmin\(\)\s*\{\s*return signedIn\(\) && request.auth.uid == ['"][A-Za-z0-9_-]+['"];\s*\}/,'function isSuperAdmin() { return signedIn() && request.auth.uid == '+JSON.stringify(bootstrap.superAdminUid)+'; }').replace(/request.auth.uid in \[[^\]]*\]; \/\/ COMPANY_ADMIN_UIDS/,'request.auth.uid in '+JSON.stringify([...new Set([bootstrap.superAdminUid,...bootstrap.adminUids])])+'; // COMPANY_ADMIN_UIDS'));
   zip.file('README.txt','COMPANY APP PACKAGE\n1. Create Firebase Authentication accounts; enable Email/Password and Anonymous.\n2. Confirm UIDs in app-config.js and firestore.rules.\n3. Publish firestore.rules in the TARGET Firebase project.\n4. Upload all package files to an HTTPS static host. No build required.\n5. Sign in as Super Admin and Save Configuration to publish defaults to Firestore.\nThis package contains no customer records and does not migrate accounts or payments.\n');
-  const blob=await zip.generateAsync({type:'blob'});download('company-app-'+bootstrap.firebase.projectId+'.zip',blob,'application/zip');message('Paket siap diunggah ke hosting HTTPS. Terapkan rules pada Firebase tujuan sebelum login.');
- }catch(e){message('Ekspor gagal: '+e.message)}
+  const blob=await zip.generateAsync({type:'blob'});download('company-app-'+bootstrap.firebase.projectId+'.zip',blob,'application/zip');message('The package is ready for HTTPS hosting. Deploy the rules to the target Firebase project before signing in.');
+ }catch(e){message('Export failed: '+e.message)}
 };
 window.getCurrentCompanyConfig=()=>clone(liveConfig);
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('controllerchange',()=>refreshCompanyInstallManifest(liveConfig));
