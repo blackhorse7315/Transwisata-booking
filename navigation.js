@@ -29,14 +29,14 @@ function validateRecord(kind,value){
   if(!r.name||r.name.length>150||!r.city||r.city.length>100||!/^[A-Z]{3}$/.test(r.iata)||!/^[A-Z]{4}$/.test(r.icao)||!Number.isInteger(r.runwayM)||r.runwayM<1||r.runwayM>20000)throw Error('Enter airport name, city, 3-letter IATA, 4-letter ICAO, and runway length in whole meters (1–20,000).');
   return r;
  }
- const r={name:String(value.name||'').trim().toUpperCase(),lat,lon};
- if(!/^[A-Z][A-Z0-9]{1,11}$/.test(r.name))throw Error('VFR name must be a unique identifier of 2–12 letters/numbers, for example PIMOL.');
+ const r={name:String(value.name||'').trim().toUpperCase().replace(/\s+/g,' '),lat,lon};
+ if(r.name.length<2||r.name.length>80||!/^[A-Z][A-Z0-9]*(?: [A-Z0-9]+)*$/.test(r.name))throw Error('VFR name must contain 2–80 letters/numbers and spaces, for example PIMOL or ABEAM PLM.');
  return r;
 }
 window.getNavigationDirectory=()=>copy(directory);
 window.routePointMatch=function(value){
  const airport=airportMatch(String(value||''));if(airport)return airport;
- const r=directory.vfrPoints[String(value||'').trim().toUpperCase()];
+ const r=directory.vfrPoints[String(value||'').trim().toUpperCase().replace(/\s+/g,' ')];
  return r?[r.name,'',r.name, r.lat,r.lon,{kind:'vfr'}]:null;
 };
 function validateCollisions(kind,r){
@@ -96,7 +96,7 @@ window.planNavigationRoute=function(points,name){
 };
 const panel=document.createElement('section');panel.id='navigationDataAdmin';
 const coords=prefix=>'<label>Latitude · DMS<input id="'+prefix+'Lat" placeholder="06° 16′ 00″ S" autocomplete="off"></label><label>Longitude · DMS<input id="'+prefix+'Lon" placeholder="106° 53′ 00″ E" autocomplete="off"></label>';
-panel.innerHTML='<h3>Airport Data Management</h3><p class="small">Add airports to the shared search directory. IATA uses 3 letters; ICAO uses 4 letters. Enter coordinates in degrees, minutes and seconds with N/S and E/W. Enter the longest usable runway length in meters from your verified airport reference.</p><div class="costgrid"><label>Airport name<input id="navAirportName" maxlength="150"></label><label>City<input id="navAirportCity" maxlength="100"></label><label>3-letter code · IATA<input id="navAirportIata" maxlength="3"></label><label>4-letter code · ICAO<input id="navAirportIcao" maxlength="4"></label><label>Runway length (meters)<input id="navAirportRunway" type="number" min="1" max="20000" step="1"></label>'+coords('navAirport')+'</div><div class="actions"><button class="btn" id="navAirportSave" type="button">Save Airport</button><button class="btn secondary" id="navAirportReset" type="button">Clear Form</button></div><p id="navAirportStatus" class="small" role="status" aria-live="polite"></p><div id="navAirportTable" style="overflow:auto"></div><h3>VFR Point Management</h3><p class="small">Register route identifiers such as PIMOL, GOLPI or ERANG with their verified DMS coordinates before using them in helicopter routes. VFR points affect route distance and flight time; they are not landing, refuel or ground-handling stops.</p><div class="costgrid"><label>Name VFR · identifier<input id="navVfrName" maxlength="12" placeholder="e.g. PIMOL"></label>'+coords('navVfr')+'</div><div class="actions"><button class="btn" id="navVfrSave" type="button">Save VFR Point</button><button class="btn secondary" id="navVfrReset" type="button">Clear Form</button></div><p id="navVfrStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrTable" style="overflow:auto"></div>';
+panel.innerHTML='<h3>Airport Data Management</h3><p class="small">Add airports to the shared search directory. IATA uses 3 letters; ICAO uses 4 letters. Enter coordinates in degrees, minutes and seconds with N/S and E/W. Enter the longest usable runway length in meters from your verified airport reference.</p><div class="costgrid"><label>Airport name<input id="navAirportName" maxlength="150"></label><label>City<input id="navAirportCity" maxlength="100"></label><label>3-letter code · IATA<input id="navAirportIata" maxlength="3"></label><label>4-letter code · ICAO<input id="navAirportIcao" maxlength="4"></label><label>Runway length (meters)<input id="navAirportRunway" type="number" min="1" max="20000" step="1"></label>'+coords('navAirport')+'</div><div class="actions"><button class="btn" id="navAirportSave" type="button">Save Airport</button><button class="btn secondary" id="navAirportReset" type="button">Clear Form</button></div><p id="navAirportStatus" class="small" role="status" aria-live="polite"></p><div id="navAirportTable" style="overflow:auto"></div><h3>VFR Point Management</h3><p class="small">Register route identifiers such as PIMOL, GOLPI or ERANG with their verified DMS coordinates before using them in helicopter routes. VFR points affect route distance and flight time; they are not landing, refuel or ground-handling stops.</p><div class="costgrid"><label>Name VFR · identifier<input id="navVfrName" maxlength="80" placeholder="e.g. PIMOL"></label>'+coords('navVfr')+'</div><div class="actions"><button class="btn" id="navVfrSave" type="button">Save VFR Point</button><button class="btn secondary" id="navVfrReset" type="button">Clear Form</button></div><p id="navVfrStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrTable" style="overflow:auto"></div>';
 el('adminWorkspace').append(panel);
 function reset(kind){
  for(const id of kind==='airports'?['navAirportName','navAirportCity','navAirportIata','navAirportIcao','navAirportRunway','navAirportLat','navAirportLon']:['navVfrName','navVfrLat','navVfrLon'])el(id).value='';
@@ -130,14 +130,17 @@ window.removeNavigationRecord=async function(kind,code){
  const status=el(kind==='airports'?'navAirportStatus':'navVfrStatus');
  if(!window.TWAAdminVerified||!window.TWAFirebase?.saveNavigationRecord){status.textContent='Authorized Admin sign-in is required.';return false}
  const r=directory[kind][code];if(!r)return false;
+ if(!navigator.onLine){status.textContent='Reconnect to remove this shared directory entry.';status.scrollIntoView({block:'center'});return false}
  const remains=kind==='airports'&&originalAirports.some(a=>a[0]===code);
- if(!remains&&Object.values(getHelicopterRoutes()).some(route=>route?.codes?.includes(code))){status.textContent='This entry is used by a saved helicopter route. Update or delete those routes first.';return false}
- if(!confirm('Remove '+code+' from the shared '+(kind==='airports'?'manual airport':'VFR point')+' directory?'))return false;
+ const referenced=Object.values(getHelicopterRoutes()).filter(route=>route?.codes?.includes(code));
+ if(kind==='airports'&&!remains&&referenced.length){status.textContent='This airport is used by a saved helicopter route. Update or delete those routes first.';status.scrollIntoView({block:'center'});return false}
+ if(!confirm('Remove '+code+' from the shared '+(kind==='airports'?'manual airport':'VFR point')+' directory?'+(kind==='vfrPoints'&&referenced.length?' Used by '+referenced.length+' saved route(s). These routes will require editing before they can be quoted.':'')))return false;
  try{
   await window.TWAFirebase.saveNavigationRecord(kind,code,null);
   applyNavigationDirectory({...directory,[kind]:{...directory[kind],[code]:null}});
-  status.textContent='Entry removed from Firebase.';return true;
- }catch(error){status.textContent='Removal failed: '+error.message;return false}
+  if((kind==='airports'?airportEdit:vfrEdit)===code)reset(kind);
+  status.textContent=code+' removed from Firebase.'+(referenced.length?' Update the saved helicopter routes that use this point.':'');status.scrollIntoView({block:'center'});return true;
+ }catch(error){status.textContent='Removal failed: '+error.message;status.scrollIntoView({block:'center'});return false}
 };
 window.drawNavigationAdmin=function(){
  for(const [kind,id] of [['airports','navAirportTable'],['vfrPoints','navVfrTable']]){
@@ -154,7 +157,7 @@ const sequence=el('heliRouteSequence'),wrap=document.createElement('div'),menu=d
 wrap.className='airport-search-wrap';menu.className='airport-suggestions';menu.id='heliRoutePointSuggestions';menu.hidden=true;menu.setAttribute('role','listbox');sequence.before(wrap);wrap.append(sequence,menu);sequence.setAttribute('aria-controls',menu.id);sequence.setAttribute('aria-autocomplete','list');
 function closeMenu(){menu.hidden=true;sequence.setAttribute('aria-expanded','false')}
 function suggest(){
- const value=sequence.value.toUpperCase(),match=value.match(/^(.*[\s,;>→–—-])?([^\s,;>→–—-]*)$/),prefix=match?.[1]||'',q=match?.[2]||'';
+ const value=sequence.value.toUpperCase(),match=value.match(/^(.*[,;>→–—-])?([^,;>→–—-]*)$/),prefix=match?.[1]||'',q=(match?.[2]||'').trim();
  menu.replaceChildren();if(!q){closeMenu();return}
  const candidates=[...airportData.map(a=>({code:a[0],label:a[2],extra:a[0]+' / '+a[1]})),...Object.values(directory.vfrPoints).map(r=>({code:r.name,label:r.name+' · VFR point',extra:navDecimalToDms(r.lat,'lat')+' · '+navDecimalToDms(r.lon,'lon')}))].filter(r=>(r.code+' '+r.label+' '+r.extra).toUpperCase().includes(q)).slice(0,12);
  for(const r of candidates){const button=document.createElement('button');button.type='button';button.className='airport-suggestion';button.setAttribute('role','option');const title=document.createElement('strong'),detail=document.createElement('small');title.textContent=r.label;detail.textContent=r.extra;button.append(title,detail);button.addEventListener('pointerdown',e=>e.preventDefault());button.onclick=()=>{sequence.value=prefix+r.code+'-';closeMenu();sequence.focus()};menu.append(button)}
@@ -162,14 +165,14 @@ function suggest(){
 }
 sequence.addEventListener('input',suggest);sequence.addEventListener('focus',suggest);sequence.addEventListener('blur',()=>setTimeout(closeMenu,160));sequence.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();if(event.key==='Enter'&&!menu.hidden){event.preventDefault();menu.querySelector('button')?.click()}});
 
-panel.insertAdjacentHTML('beforeend','<h4>Import VFR Points · Multiple Lines</h4><p class="small">Paste one point per line: name, latitude, longitude. Coordinates are read automatically. Review the preview, then import all points together. Existing names will be updated exactly as entered.</p><label for="navVfrBulkInput">VFR points · name and DMS coordinates</label><textarea id="navVfrBulkInput" rows="7" spellcheck="false" placeholder="PIMAL S06 15&#39;58&quot; E106 47&#39;08&quot;&#10;GUSAN S05 46&#39;00&quot; E105 47&#39;05&quot;"></textarea><p id="navVfrBulkStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrBulkPreview" style="overflow:auto"></div><div class="actions"><button id="navVfrBulkSave" class="btn" type="button" disabled>Import VFR Points</button></div>');
+panel.insertAdjacentHTML('beforeend','<h4>Import VFR Points · Multiple Lines</h4><p class="small">Paste one point per line: name, latitude, longitude. Coordinates are read automatically. Review the preview, then import all points together. Names may contain spaces; an optional VFR suffix is ignored. Existing names will be updated.</p><label for="navVfrBulkInput">VFR points · name and DMS coordinates</label><textarea id="navVfrBulkInput" rows="7" spellcheck="false" placeholder="PIMAL S06 15&#39;58&quot; E106 47&#39;08&quot;&#10;GUSAN S05 46&#39;00&quot; E105 47&#39;05&quot;"></textarea><p id="navVfrBulkStatus" class="small" role="status" aria-live="polite"></p><div id="navVfrBulkPreview" style="overflow:auto"></div><div class="actions"><button id="navVfrBulkSave" class="btn" type="button" disabled>Import VFR Points</button></div>');
 let bulkSaving=false;
 window.parseVFRBulkInput=function(text){
  const records=[],names=new Set();
  String(text||'').split(/\r?\n/).forEach((line,index)=>{
   if(!line.trim())return;
   try{
-   const match=line.trim().toUpperCase().match(/^([A-Z][A-Z0-9]{1,11})\s+([NS]\s*\d.*?)[\s,;]+([EW]\s*\d.*)$/);
+   const match=line.trim().toUpperCase().replace(/\s+VFR\s*$/,'').match(/^([A-Z][A-Z0-9]*(?:\s+[A-Z0-9]+)*?)\s+([NS]\s*\d.*?)[\s,;]+([EW]\s*\d.*)$/);
    if(!match)throw Error('Use NAME S06 15\'58" E106 47\'08".');
    const r=validateRecord('vfrPoints',{name:match[1],lat:navDmsToDecimal(match[2],'lat'),lon:navDmsToDecimal(match[3],'lon')});
    validateCollisions('vfrPoints',r);

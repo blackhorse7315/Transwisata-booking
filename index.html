@@ -445,7 +445,8 @@ function cancelHelicopterRouteEdit(clearForm=true){
 function normalizeHelicopterRoute(fromValue,toValue,routeValue){
  const start=airportMatch(fromValue),end=airportMatch(toValue);
  if(!start||!end||start[0]===end[0])throw Error('Choose distinct valid From and To airports.');
- const tokens=routeValue.trim().toUpperCase().split(/[\s,;>→–—-]+/).filter(Boolean),points=tokens.map(window.routePointMatch||airportMatch);
+ const matchPoint=window.routePointMatch||airportMatch;
+ const tokens=routeValue.trim().toUpperCase().split(/[,;>→–—-]+/).flatMap(part=>matchPoint(part.trim())?[part.trim()]:part.trim().split(/\s+/)).filter(Boolean),points=tokens.map(matchPoint);
  if(points.some(p=>!p))throw Error('Route contains an unknown airport or VFR point. Register the point in the Admin directory first.');
  if(!points.length||points[0][0]!==start[0])points.unshift(start);
  if(points[points.length-1][0]!==end[0])points.push(end);
@@ -813,21 +814,25 @@ function offlineMap(points){
  const south=Math.max(-18,Math.min(...all.map(p=>p[1]))-5),north=Math.min(45,Math.max(...all.map(p=>p[1]))+5);
  const x=lon=>(lon-65)*8,y=lat=>(45-lat)*6;
  const lines=points.slice(1).map((p,i)=>{const pts=greatCirclePoints(points[i],p);return `<polyline points="${pts.map(z=>x(z[1]).toFixed(1)+','+y(z[0]).toFixed(1)).join(' ')}" fill="none" stroke="#1165bd" stroke-width="3" stroke-dasharray="8 5" vector-effect="non-scaling-stroke"/>`}).join('');
- const markers=points.map((p,i)=>`<circle cx="${x(p[4])}" cy="${y(p[3])}" r="2.2" fill="${i===0?'#d6a34e':window.isVFRPoint?.(p)?'#b36414':'#144e81'}" stroke="white" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="${x(p[4])+6}" y="${y(p[3])-7}" font-size="5" font-family="Arial,sans-serif" font-weight="700" fill="#142c44" stroke="white" stroke-width="1" paint-order="stroke" stroke-linejoin="round">${esc(p[0])}</text>`).join('');
+ const markers=points.map((p,i)=>`<g class="route-map-marker" data-x="${x(p[4])}" data-y="${y(p[3])}" transform="translate(${x(p[4])} ${y(p[3])})"><circle cx="0" cy="0" r="2.2" fill="${i===0?'#d6a34e':window.isVFRPoint?.(p)?'#b36414':'#144e81'}" stroke="white" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="6" y="-7" font-size="5" font-family="Arial,sans-serif" font-weight="700" fill="#142c44" stroke="white" stroke-width="1" paint-order="stroke" stroke-linejoin="round">${esc(p[0])}</text></g>`).join('');
  const vb=[x(west),y(north),Math.max(80,(east-west)*8),Math.max(80,(north-south)*6)].join(' ');
  return `<div class="route-zoom-map" style="border-radius:12px;overflow:hidden;background:#d9eef9"><div role="group" aria-label="Route map zoom controls" style="display:flex;align-items:center;gap:8px;padding:8px;background:#eff8fd"><button type="button" class="btn secondary" style="padding:8px 13px" aria-label="Zoom in route map" onclick="routeMapZoom(this,1.5)">＋</button><button type="button" class="btn secondary" style="padding:8px 13px" aria-label="Zoom out route map" onclick="routeMapZoom(this,1/1.5)">−</button><button type="button" class="btn secondary" style="padding:8px 13px" onclick="routeMapReset(this)">Reset</button><span class="route-zoom-level small" aria-live="polite">100%</span></div><svg class="route-zoom-svg" data-initial-viewbox="${vb}" data-zoom="1" viewBox="${vb}" tabindex="0" onkeydown="routeMapKey(event)" style="display:block;width:100%;height:340px;background:#d9eef9;touch-action:none;cursor:grab" role="img" aria-label="Interactive route map. Use zoom controls and drag to pan."><g fill="none" stroke="#86a6a4" stroke-width="1.3" vector-effect="non-scaling-stroke">${offlineCoastSVG}</g>${lines}${markers}</svg></div><div class="small" style="padding:8px">Use ＋ / − to zoom and drag the map to move. Blue airport markers / amber VFR waypoints · VFR points are not landing or refuel stops · not for navigation.</div>`;
 }
 
+function routeMapScaleMarkers(svg){
+ const scale=1/Math.max(1,Number(svg.dataset.zoom)||1);
+ svg.querySelectorAll('.route-map-marker').forEach(marker=>marker.setAttribute('transform','translate('+marker.dataset.x+' '+marker.dataset.y+') scale('+scale+')'));
+}
 function routeMapZoom(control,factor){
  const map=control.closest('.route-zoom-map'),svg=map?.querySelector('.route-zoom-svg');if(!svg)return;
  const original=svg.dataset.initialViewbox.split(' ').map(Number),v=svg.viewBox.baseVal,zoom=Number(svg.dataset.zoom)||1,next=Math.min(16,Math.max(.5,zoom*factor));
  const width=original[2]/next,height=original[3]/next,x=v.x+v.width/2-width/2,y=v.y+v.height/2-height/2;
- svg.setAttribute('viewBox',[x,y,width,height].join(' '));svg.dataset.zoom=String(next);map.querySelector('.route-zoom-level').textContent=Math.round(next*100)+'%';
+ svg.setAttribute('viewBox',[x,y,width,height].join(' '));svg.dataset.zoom=String(next);routeMapScaleMarkers(svg);map.querySelector('.route-zoom-level').textContent=Math.round(next*100)+'%';
  map.querySelector('[aria-label="Zoom in route map"]').disabled=next>=16;map.querySelector('[aria-label="Zoom out route map"]').disabled=next<=.5;
 }
 function routeMapReset(control){
  const map=control.closest('.route-zoom-map'),svg=map?.querySelector('.route-zoom-svg');if(!svg)return;
- svg.setAttribute('viewBox',svg.dataset.initialViewbox);svg.dataset.zoom='1';map.querySelector('.route-zoom-level').textContent='100%';
+ svg.setAttribute('viewBox',svg.dataset.initialViewbox);svg.dataset.zoom='1';routeMapScaleMarkers(svg);map.querySelector('.route-zoom-level').textContent='100%';
  map.querySelectorAll('button').forEach(button=>button.disabled=false);
 }
 function routeMapKey(event){
@@ -1155,7 +1160,7 @@ window.TWAFirebase={
  adminLogout:async()=>{if(unsubBookings)unsubBookings();unsubBookings=null;window.TWAAdminVerified=false;window.TWASuperAdminVerified=false;window.syncSuperAdminView?.();window.TWACloudBookings=null;await signOut(auth);await signInAnonymously(auth);window.syncAdminView?.()},
  saveNavigationRecord:async(kind,code,value)=>{
   if(!window.TWAAdminVerified)throw Error('Admin sign-in required.');
-  if(!['airports','vfrPoints'].includes(kind)||!/^[A-Z][A-Z0-9]{1,11}$/.test(code))throw Error('Invalid navigation entry identifier.');
+  if(!['airports','vfrPoints'].includes(kind)||typeof code!=='string'||code.length<2||code.length>80||!/^[A-Z][A-Z0-9]*(?: [A-Z0-9]+)*$/.test(code))throw Error('Invalid navigation entry identifier.');
   await setDoc(configs,{navigationDirectory:{[kind]:{[code]:value}}},{mergeFields:['navigationDirectory.'+kind+'.'+code]});
  },
  saveVFRPoints:async(records)=>{
@@ -1163,7 +1168,7 @@ window.TWAFirebase={
   if(!Array.isArray(records)||records.length<1||records.length>500)throw Error('Enter 1–500 VFR points.');
   const points={},fields=[];
   for(const record of records){
-   if(!/^[A-Z][A-Z0-9]{1,11}$/.test(record.name)||typeof record.lat!=='number'||typeof record.lon!=='number'||!Number.isFinite(record.lat)||!Number.isFinite(record.lon)||Math.abs(record.lat)>90||Math.abs(record.lon)>180||points[record.name])throw Error('Invalid or duplicate VFR point.');
+   if(typeof record.name!=='string'||record.name.length<2||record.name.length>80||!/^[A-Z][A-Z0-9]*(?: [A-Z0-9]+)*$/.test(record.name)||typeof record.lat!=='number'||typeof record.lon!=='number'||!Number.isFinite(record.lat)||!Number.isFinite(record.lon)||Math.abs(record.lat)>90||Math.abs(record.lon)>180||points[record.name])throw Error('Invalid or duplicate VFR point.');
    points[record.name]={name:record.name,lat:record.lat,lon:record.lon};fields.push('navigationDirectory.vfrPoints.'+record.name);
   }
   await setDoc(configs,{navigationDirectory:{vfrPoints:points}},{mergeFields:fields});

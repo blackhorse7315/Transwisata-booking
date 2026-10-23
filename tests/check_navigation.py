@@ -114,6 +114,10 @@ try:
                 showPriceDetails(aircraft.findIndex(a=>a[0]===name));
                 if(!document.getElementById('realRouteMap').textContent.includes('PIMOL')||!document.getElementById('smartRouteDetails').textContent.includes('GUSAN'))throw Error('VFR map/detail labels missing');
                 const map=document.querySelector('#realRouteMap .route-zoom-map'),svg=map.querySelector('svg'),initial=svg.getAttribute('viewBox');
+                const marker=svg.querySelector('.route-map-marker'),circle=marker.querySelector('circle'),label=marker.querySelector('text'),circleWidth=circle.getBoundingClientRect().width,labelWidth=label.getBoundingClientRect().width;
+                routeMapZoom(svg,5);
+                if(Math.abs(circle.getBoundingClientRect().width-circleWidth)>.1||Math.abs(label.getBoundingClientRect().width-labelWidth)>.1)throw Error('Map markers or labels grew at 500% zoom');
+                routeMapReset(svg);
                 map.querySelector('[aria-label="Zoom in route map"]').click();
                 if(svg.dataset.zoom!=='1.5'||svg.viewBox.baseVal.width>=Number(initial.split(' ')[2]))throw Error('Map zoom in failed');
                 map.querySelector('[aria-label="Zoom out route map"]').click();
@@ -132,9 +136,9 @@ try:
                 const refuel=priceForAircraft(name);
                 if(refuel.sectors!==2||refuel.items[2][1]!==111+airportRate('ZQA')+222||refuel.items[3][1]!==2*num('landing'))throw Error('Actual refuel airport not charged');
                 let unknown=false;try{normalizeHelicopterRoute('HLP','TKG','HLP-UNKNOWN-TKG')}catch{unknown=true}if(!unknown)throw Error('Unknown VFR point silently accepted');
-                if(await removeNavigationRecord('vfrPoints','PIMOL'))throw Error('Referenced VFR point deleted');
+                const confirmBefore=window.confirm;window.confirm=()=>false;try{if(await removeNavigationRecord('vfrPoints','PIMOL')||!routePointMatch('PIMOL'))throw Error('Cancelled VFR deletion changed data')}finally{window.confirm=confirmBefore}
                 set('from','HLP');set('to','TKG');
-                return {map:true,viaDistance:plan.totalNM,landingSectors:quote.sectors,reverse:true,refuelAirport:true,referencedDeleteBlocked:true};
+                return {map:true,viaDistance:plan.totalNM,landingSectors:quote.sectors,reverse:true,refuelAirport:true,cancelledDeletePreserved:true};
             }finally{window.airportFuelUSDPerGallon=originalFuel}
         }""")
         print("VFR_ROUTE_PRICING_CHECKS",json.dumps(result))
@@ -179,6 +183,28 @@ GOLFI S06 16'43" E106 38'59" """
             return {points:6,atomicSave:true,existingUpdated:true,invalidRejected:true};
         }""",bulk_text)
         print("VFR_BULK_IMPORT_CHECKS",json.dumps(result))
+
+        extended_text="""ABEAM PLM S03 01'21" E104 13'20" VFR
+TERKA S04 14'02" E104 57'37" VFR
+ABEAM TERKA S04 17'36" E104 46'11" VFR
+WAY KAMBAS S05 07'24" E105 44'29" VFR
+ABEAM JAMBI S01 41'25" E103 34'42" VFR
+ABEAM JAPURA S00 23'26" E102 17'25" VFR
+SCC S06 33'32" E106 50'53" VFR
+SENTUL OPEN AREA S06 33'41" E106 51'00" VFR"""
+        page.locator("#navVfrBulkInput").fill(extended_text)
+        assert page.locator("#navVfrBulkPreview tbody tr").count()==8
+        page.locator("#navVfrBulkSave").click()
+        page.wait_for_function("!!routePointMatch('SENTUL OPEN AREA')")
+        assert page.evaluate("Math.abs(routePointMatch('ABEAM PLM')[3]-(-3-1/60-21/3600))<1e-9")
+        result=page.evaluate("""()=>{
+            const points=normalizeHelicopterRoute('HLP','TKG','HLP-ABEAM PLM-WAY KAMBAS-TKG');
+            if(points.length!==4||points[1][0]!=='ABEAM PLM'||points[2][0]!=='WAY KAMBAS')throw Error('Multiword VFR route failed');
+            if(normalizeHelicopterRoute('HLP','TKG','HLP PIMOL TKG').length!==3)throw Error('Legacy space-separated route broken');
+            return {multiword:true,trailingVFR:true,points:8};
+        }""")
+        print("VFR_USER_FORMAT_CHECKS",json.dumps(result))
+
         other.evaluate("data=>applyNavigationDirectory(data.navigationDirectory)",page.evaluate("testPublicSettings"))
         assert other.evaluate("!!routePointMatch('PIMAL')&&!!routePointMatch('GOLFI')&&!!airportMatch('ZQA')")
         page.evaluate("showPage('booking');showPriceDetails(aircraft.findIndex(a=>a[0]==='Bell 412EP'))")
@@ -194,11 +220,34 @@ GOLFI S06 16'43" E106 38'59" """
         print("ROUTE_MAP_ZOOM_PAN_CHECKS passed")
 
         result=page.evaluate("""async()=>{
+            const confirmBefore=window.confirm,saveBefore=TWAFirebase.saveNavigationRecord;
+            let warning='';
+            window.confirm=message=>{warning=message;return true};
+            const before=JSON.stringify(getNavigationDirectory());
+            try{
+                TWAFirebase.saveNavigationRecord=async()=>{throw Error('Simulated delete failure')};
+                if(await removeNavigationRecord('vfrPoints','PIMOL')||JSON.stringify(getNavigationDirectory())!==before)throw Error('Failed deletion changed data');
+                TWAFirebase.saveNavigationRecord=saveBefore;
+                const row=Array.from(document.querySelectorAll('#navVfrTable tbody tr')).find(r=>r.cells[0].textContent==='PIMOL');
+                row.querySelector('[data-delete]').click();
+                await new Promise(resolve=>setTimeout(resolve,30));
+                if(routePointMatch('PIMOL')||!warning.includes('saved route'))throw Error('Referenced VFR Delete button failed');
+                const plan=selectedRoutePlan(airportMatch('HLP'),airportMatch('TKG'),'Bell 412EP');
+                if(plan.ok||!plan.reason.includes('unknown'))throw Error('Deleted point caused silent route substitution');
+                return {deleteButton:true,failedSavePreserved:true,referencedRouteRequiresEdit:true};
+            }finally{window.confirm=confirmBefore;TWAFirebase.saveNavigationRecord=saveBefore}
+        }""")
+        print("VFR_REFERENCED_DELETE_CHECKS",json.dumps(result))
+        other.evaluate("data=>applyNavigationDirectory(data.navigationDirectory)",page.evaluate("testPublicSettings"))
+        assert other.evaluate("!routePointMatch('PIMOL')&&!!routePointMatch('ABEAM PLM')")
+
+
+        result=page.evaluate("""async()=>{
             const original=window.confirm;window.confirm=()=>true;
             try{
                 tenantStorage.setItem('twaHelicopterRoutesV1','{}');
                 if(!await removeNavigationRecord('airports','ZQA')||airportMatch('ZQA')||TWARunwayReference.airports.ZQA)throw Error('Manual airport removal did not clear directory/runway override');
-                if(!await removeNavigationRecord('vfrPoints','PIMOL')||routePointMatch('PIMOL'))throw Error('VFR removal did not clear route lookup');
+                if(!await removeNavigationRecord('vfrPoints','SOBAR')||routePointMatch('SOBAR'))throw Error('VFR removal did not clear route lookup');
                 return {airportRemoved:true,vfrRemoved:true};
             }finally{window.confirm=original}
         }""")
