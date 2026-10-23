@@ -93,6 +93,7 @@ try:
                 await saveFunction('helicopterRoutes',originalRoutes);
                 tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(originalRoutes));
                 cancelHelicopterRouteEdit(false);drawHelicopterRoutesAdmin();
+                set('heliRouteFrom','HLP');set('heliRouteTo','TKG');set('heliRouteAircraft','both');set('heliRouteSequence',codes.join('-'));document.getElementById('heliRouteReverse').checked=true;
             }
             console.log('HELICOPTER_ROUTE_EDIT_CHECKS passed');
             const name='Bell 412EP',plan=selectedRoutePlan(airportMatch('HLP'),airportMatch('TKG'),name);
