@@ -25,7 +25,8 @@ try:
             window.testWrites=[];
             window.TWAFirebase={
                 saveNavigationRecord:async(kind,code,value)=>{testWrites.push([kind,code,value]);testPublicSettings.navigationDirectory[kind][code]=value},
-                saveConfig:async(key,value)=>{testPublicSettings[key]=value}
+                saveConfig:async(key,value)=>{testPublicSettings[key]=value},
+                saveVFRPoints:async records=>{testWrites.push(['bulk',records]);for(const r of records)testPublicSettings.navigationDirectory.vfrPoints[r.name]=r}
             };
             set('navAirportName','Fixture Airport');set('navAirportCity','Fixture City');set('navAirportIata','ZQA');set('navAirportIcao','WAQA');set('navAirportRunway','1200');
             set('navAirportLat','06° 30′ 00″ S');set('navAirportLon','106° 45′ 00″ E');
@@ -112,6 +113,15 @@ try:
                 if(Math.abs(quote.items[1][1]-expectedFuel)>1e-6)throw Error('Fuel not priced from actual departure airport over VFR route');
                 showPriceDetails(aircraft.findIndex(a=>a[0]===name));
                 if(!document.getElementById('realRouteMap').textContent.includes('PIMOL')||!document.getElementById('smartRouteDetails').textContent.includes('GUSAN'))throw Error('VFR map/detail labels missing');
+                const map=document.querySelector('#realRouteMap .route-zoom-map'),svg=map.querySelector('svg'),initial=svg.getAttribute('viewBox');
+                map.querySelector('[aria-label="Zoom in route map"]').click();
+                if(svg.dataset.zoom!=='1.5'||svg.viewBox.baseVal.width>=Number(initial.split(' ')[2]))throw Error('Map zoom in failed');
+                map.querySelector('[aria-label="Zoom out route map"]').click();
+                if(svg.dataset.zoom!=='1')throw Error('Map zoom out failed');
+                routeMapZoom(svg,100);if(svg.dataset.zoom!=='16')throw Error('Map upper zoom limit failed');
+                routeMapZoom(svg,.0001);if(svg.dataset.zoom!=='0.5')throw Error('Map lower zoom limit failed');
+                routeMapReset(svg);if(svg.getAttribute('viewBox')!==initial)throw Error('Map reset failed');
+                svg.dispatchEvent(new KeyboardEvent('keydown',{key:'+',bubbles:true}));if(svg.dataset.zoom!=='1.5')throw Error('Map keyboard zoom failed');
                 closePriceDetails();
                 trip('Round Trip',Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Round Trip'));
                 set('returnDate',document.getElementById('date').value);calculateEstimate();
@@ -140,6 +150,49 @@ try:
             if(!plan.ok||plan.points.length!==5||plan.legs.length!==2)throw Error('Other device did not resolve shared airport/VFR route');
         }""",shared)
         print("OTHER_DEVICE_NAVIGATION_CHECK passed")
+
+        bulk_text="""PIMAL S06 15'58" E106 47'08"
+GUSAN S05 46'00" E105 47'05"
+ERANG S06 06'54" E106 09'14"
+SOBAR S06 13'07" E106 28'25"
+BUDIT S06 17'32" E106 33'57"
+GOLFI S06 16'43" E106 38'59" """
+        page.evaluate("showPage('admin')")
+        page.locator("#navVfrBulkInput").fill(bulk_text)
+        assert page.locator("#navVfrBulkPreview tbody tr").count()==6
+        result=page.evaluate("""async text=>{
+            const before=testWrites.length;
+            const good=parseVFRBulkInput(text);
+            if(good.length!==6||good[0].name!=='PIMAL'||Math.abs(good[0].lat-(-6-15/60-58/3600))>1e-9||Math.abs(good[0].lon-(106+47/60+8/3600))>1e-9)throw Error('Bulk DMS parsing incorrect');
+            window.TWAAdminVerified=false;if(await importVFRBulkInput()||testWrites.length!==before)throw Error('Unauthorized bulk import');
+            window.TWAAdminVerified=true;
+            for(const bad of [text+'\\n'+text.split('\\n')[0],'BAD S06 60\\'00" E106 00\\'00"','HLP S06 00\\'00" E106 00\\'00"','BAD S91 00\\'00" E106 00\\'00"']){
+                document.getElementById('navVfrBulkInput').value=bad;
+                if(await importVFRBulkInput()||testWrites.length!==before)throw Error('Invalid bulk import wrote partial data');
+            }
+            document.getElementById('navVfrBulkInput').value=text;
+            const save=TWAFirebase.saveVFRPoints;TWAFirebase.saveVFRPoints=async()=>{throw Error('Simulated import failure')};
+            if(await importVFRBulkInput()||routePointMatch('PIMAL'))throw Error('Failed import changed local directory');
+            TWAFirebase.saveVFRPoints=save;
+            if(!await importVFRBulkInput()||testWrites.length!==before+1)throw Error('Bulk save failed or did not use one write');
+            if(!routePointMatch('PIMAL')||!routePointMatch('PIMOL')||!airportMatch('ZQA')||Math.abs(routePointMatch('GUSAN')[3]-good[1].lat)>1e-9||Object.keys(getNavigationDirectory().vfrPoints).length!==9)throw Error('Bulk import did not preserve directory or update coordinates');
+            return {points:6,atomicSave:true,existingUpdated:true,invalidRejected:true};
+        }""",bulk_text)
+        print("VFR_BULK_IMPORT_CHECKS",json.dumps(result))
+        other.evaluate("data=>applyNavigationDirectory(data.navigationDirectory)",page.evaluate("testPublicSettings"))
+        assert other.evaluate("!!routePointMatch('PIMAL')&&!!routePointMatch('GOLFI')&&!!airportMatch('ZQA')")
+        page.evaluate("showPage('booking');showPriceDetails(aircraft.findIndex(a=>a[0]==='Bell 412EP'))")
+        svg=page.locator("#realRouteMap .route-zoom-svg")
+        box=svg.bounding_box()
+        before=svg.get_attribute("viewBox")
+        page.mouse.move(box["x"]+box["width"]/2,box["y"]+box["height"]/2)
+        page.mouse.down()
+        page.mouse.move(box["x"]+box["width"]/2+30,box["y"]+box["height"]/2+20,steps=4)
+        page.mouse.up()
+        assert svg.get_attribute("viewBox")!=before
+        page.evaluate("closePriceDetails()")
+        print("ROUTE_MAP_ZOOM_PAN_CHECKS passed")
+
         result=page.evaluate("""async()=>{
             const original=window.confirm;window.confirm=()=>true;
             try{

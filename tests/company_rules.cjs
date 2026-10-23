@@ -25,6 +25,12 @@ const {doc,setDoc,getDoc,updateDoc,serverTimestamp}=require('firebase/firestore'
   await assertFails(setDoc(doc(visitor,'publicSettings','bookingApp'),{navigationDirectory:{vfrPoints:{BADFIX:{name:'BADFIX',lat:0,lon:0}}}},{mergeFields:['navigationDirectory.vfrPoints.BADFIX']}));
   const publicDirectory=(await assertSucceeds(getDoc(doc(guest,'publicSettings','bookingApp')))).data().navigationDirectory;
   if(!publicDirectory.airports.ZQA||!publicDirectory.vfrPoints.PIMOL||publicDirectory.vfrPoints.BADFIX)throw Error('Navigation fields or access not preserved');
+  const batch={PIMAL:{name:'PIMAL',lat:-6.2661,lon:106.7856},GUSAN:{name:'GUSAN',lat:-5.7667,lon:105.7847}};
+  const masks=Object.keys(batch).map(code=>'navigationDirectory.vfrPoints.'+code);
+  await assertSucceeds(setDoc(settings,{navigationDirectory:{vfrPoints:batch}},{mergeFields:masks}));
+  await assertFails(setDoc(doc(visitor,'publicSettings','bookingApp'),{navigationDirectory:{vfrPoints:batch}},{mergeFields:masks}));
+  const imported=(await assertSucceeds(getDoc(doc(guest,'publicSettings','bookingApp')))).data().navigationDirectory;
+  if(!imported.airports.ZQA||!imported.vfrPoints.PIMOL||!imported.vfrPoints.PIMAL||!imported.vfrPoints.GUSAN)throw Error('Bulk VFR import overwrote shared directory');
   console.log('NAVIGATION_FIRESTORE_CHECKS passed');
 
   await assertSucceeds(updateDoc(doc(root,'publicSettings','bookingApp'),{'customization.companyName':'Allowed'}));
