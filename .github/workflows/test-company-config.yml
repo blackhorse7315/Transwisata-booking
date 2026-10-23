@@ -5,10 +5,12 @@ on:
       - 'index.html'
       - 'customization.js'
       - 'multicity.js'
+      - 'runways.js'
       - 'app-config.js'
       - 'firestore.rules'
       - 'sw.js'
       - 'scripts/build_pwa.py'
+      - 'scripts/build_runways.py'
       - 'tests/**'
       - '.github/workflows/test-company-config.yml'
   workflow_dispatch:
