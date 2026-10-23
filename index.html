@@ -653,6 +653,7 @@ async function saveImportedFuelPrices(){
 }
 
 function priceForAircraft(name,sector=null){
+ if(window.checkRunwayCompatibility&&!window.checkRunwayCompatibility(name,sector).eligible)return null;
  const a=assumptions[name],start=sector?airportMatch(sector.from):airportMatch(from.value),end=sector?airportMatch(sector.to):airportMatch(to.value);if(!a||!start||!end||start===end)return null;
  const helicopter=isHelicopter(name);
  const plan=helicopter?selectedRoutePlan(start,end,name):null;
@@ -791,6 +792,7 @@ const aircraft=[['Gulfstream IV-SP','Executive jet','PK-TWY'],['King Air 350i','
  const customerName=field('name').value.trim(), customerEmail=field('email').value.trim(), customerPhone=field('phone').value.trim();
  if(!customerName||!customerEmail.includes('@')||!customerPhone){alert('Please provide your name, valid email and phone number.');return false}
  const selectedPlane=field('plane').value;
+ if(selectedPlane&&window.runwayAllowsBooking&&!window.runwayAllowsBooking(selectedPlane))return false;
  if(!window.TWAHoldsReady||!navigator.onLine){alert('Live availability is unavailable. Please reconnect before submitting.');return false}
  if(selectedPlane){const holds=cleanHolds(),existing=holds[selectedPlane];if(existing&&existing.owner!==holdOwner){alert('This aircraft is currently unavailable. Please choose another aircraft.');return false}if(!existing){alert('Please select an aircraft again to start a 5-minute hold.');return false}}
  const ref='TWA-'+Date.now().toString(36).toUpperCase();
@@ -911,6 +913,7 @@ function getHolds(){return window.TWACloudHolds||{}}
 function cleanHolds(){return Object.fromEntries(Object.entries(getHolds()).filter(([,v])=>v&&(v.status==='paid'||v.status==='pending'&&Number(v.expires)>Date.now())))}
 function formatRemaining(ms){const sec=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
 async function holdAircraft(planeName){
+ if(window.runwayAllowsBooking&&!window.runwayAllowsBooking(planeName))return false;
  if(holdBusy)return false;
  if(!window.TWAHoldsReady||!navigator.onLine||!window.TWAFirebase){alert('Live availability unavailable. '+(window.TWAHoldsError||'Wait for Firebase.'));return false}
  holdBusy=true;
@@ -945,7 +948,7 @@ window.addEventListener('online',updateHoldUI);window.addEventListener('offline'
 window.addEventListener('storage',updateHoldUI);
 setInterval(updateHoldUI,1000);
 updateHoldUI();
-</script><script src="./multicity.js"></script><script src="./customization.js"></script><script type="module" id="twaFirebaseModule">
+</script><script src="./multicity.js"></script><script src="./runway-data.js"></script><script src="./runways.js"></script><script src="./customization.js"></script><script type="module" id="twaFirebaseModule">
 import {initializeApp,deleteApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInAnonymously,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,setDoc,getDoc,collection,addDoc,updateDoc,onSnapshot,serverTimestamp,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
