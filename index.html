@@ -1096,7 +1096,7 @@ async function bookingRequestsPDF(rows){
    head:[['Request Details · Reference','Flight Purpose / Trip Type','Payment','Additional Requirements']],
    body:details.map(r=>[String(r.ref||''),[r.purpose,r.trip].filter(Boolean).join('\n'),[r.paymentMethod,r.paymentStatus].filter(Boolean).join('\n')||'Not specified',String(r.notes||'None')]),
    columnStyles:{0:{cellWidth:42,fontStyle:'bold'},1:{cellWidth:52},2:{cellWidth:52},3:{cellWidth:123}}
-  );
+  });
  }
  const pages=doc.getNumberOfPages(),width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight();
  for(let page=1;page<=pages;page++){
