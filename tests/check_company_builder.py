@@ -111,6 +111,64 @@ try:
         page.set_viewport_size({"width":1280,"height":900})
         assert not errors, errors
 
+
+        result=page.evaluate("""async()=>{
+            const set=(id,v)=>document.getElementById(id).value=v;
+            const snapshot=JSON.parse(JSON.stringify(TWARunwayReference.airports));
+            const values=Object.fromEntries(['from','to','plane'].map(id=>[id,document.getElementById(id).value]));
+            const originalFirebase=window.TWAFirebase;
+            const opened=(lengths)=>({status:'available',runways:lengths.map(lengthM=>({lengthM,id:'TEST',surface:'TEST FIXTURE'}))});
+            let reserved=false;
+            try{
+                if(!TWARunwayReference.revision||!TWARunwayReference.sourceDate||snapshot.HLP.runways[0].lengthM<1600)throw Error('Sourced runway reference missing');
+                TWARunwayReference.airports.HLP=opened([3000]);
+                set('from','WIHH');set('to','WARR');
+                for(const [name,min] of [['Gulfstream IV-SP',1600],['King Air 350i',1000],['CASA 212-200',800]]){
+                    TWARunwayReference.airports.SUB=opened([min-1]);
+                    const rejected=checkRunwayCompatibility(name);
+                    if(rejected.eligible||rejected.issues[0].kind!=='short'||rejected.issues[0].minimumM!==min||priceForAircraft(name)!==null)throw Error('Below-minimum runway accepted: '+name);
+                    TWARunwayReference.airports.SUB=opened([min]);
+                    if(!checkRunwayCompatibility(name).eligible||!priceForAircraft(name))throw Error('Exact minimum rejected: '+name);
+                }
+                TWARunwayReference.airports.SUB=opened([700,1600]);
+                if(!checkRunwayCompatibility('Gulfstream IV-SP').eligible)throw Error('Longest open runway not considered');
+                TWARunwayReference.airports.HLP=opened([1599]);TWARunwayReference.airports.SUB=opened([3000]);
+                if(checkRunwayCompatibility('Gulfstream IV-SP').eligible)throw Error('Departure airport not checked');
+                TWARunwayReference.airports.HLP=opened([3000]);TWARunwayReference.airports.SUB=opened([1599]);
+                set('plane','Gulfstream IV-SP');calculateEstimate();
+                showPriceDetails(0);
+                if(!document.getElementById('modalBookButton').hidden||!document.getElementById('priceModalContent').textContent.includes('1,599 m')||!document.getElementById('priceModalContent').textContent.includes('1,600 m'))throw Error('Professional restriction notice missing');
+                window.TWAFirebase={reserveAircraft:async()=>{reserved=true}};
+                if(await holdAircraft('Gulfstream IV-SP')!==false||reserved)throw Error('Restricted aircraft reserved');
+                set('name','Runway Fixture');set('email','fixture@example.com');set('phone','+62000000000');
+                if(submitBooking()!==false)throw Error('Restricted aircraft booking submitted');
+                next();
+                if(!document.getElementById('contact').classList.contains('hidden')||lastEstimate!==null)throw Error('Restricted aircraft continued');
+                closePriceDetails();
+                TWARunwayReference.airports.SUB={status:'closed',runways:[{lengthM:3000}]};
+                if(checkRunwayCompatibility('King Air 350i').eligible)throw Error('Closed airport accepted');
+                delete TWARunwayReference.airports.SUB;
+                const unknown=checkRunwayCompatibility('King Air 350i');
+                if(unknown.eligible||unknown.issues[0].kind!=='unknown'||unknown.issues[0].message.includes('below'))throw Error('Missing data misrepresented');
+                for(const name of ['Bell 412EP','AW109S Grand'])if(!checkRunwayCompatibility(name).eligible||checkRunwayCompatibility(name).applicable)throw Error('Helicopter incorrectly restricted');
+                set('plane','');set('from','HLP');set('to','SUB');
+                TWARunwayReference.airports.SUB=opened([3000]);TWARunwayReference.airports.DPS=opened([1599]);
+                trip('Multi City',Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Multi City'));
+                set('mcFrom2','SUB');set('mcTo2','DPS');
+                if(checkRunwayCompatibility('Gulfstream IV-SP').eligible||priceForAircraft('Gulfstream IV-SP')!==null)throw Error('Later Multi City airport skipped');
+                TWARunwayReference.airports.DPS=opened([3000]);TWARunwayReference.airports.BPN=opened([999]);set('mcFrom2','BPN');
+                if(checkRunwayCompatibility('King Air 350i').eligible)throw Error('Positioning airport skipped');
+                return {thresholds:[1600,1000,800],departure:true,multiCity:true,positioning:true,unknown:true,helicoptersExempt:true,bookingBlocked:true};
+            }finally{
+                window.TWAFirebase=originalFirebase;TWARunwayReference.airports=snapshot;
+                trip('One Way',Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='One Way'));
+                for(const [id,value] of Object.entries(values))set(id,value);
+                closePriceDetails();updateRoute();
+            }
+        }""")
+        print("RUNWAY_SCREENING_CHECKS",json.dumps(result))
+        assert not errors, errors
+
         page.evaluate("showPage('superAdmin')")
         assert page.locator("#saGate").is_visible()
         assert not page.locator("#saWorkspace").is_visible()
@@ -142,7 +200,7 @@ try:
         downloaded.save_as("work/company-app.zip")
         with zipfile.ZipFile("work/company-app.zip") as package:
             files=set(package.namelist())
-            assert {"index.html","customization.js","multicity.js","app-config.js","manifest.webmanifest","sw.js","firestore.rules","assets/icon-192.png","assets/icon-512.png","assets/favicon-32.png"}.issubset(files)
+            assert {"index.html","customization.js","multicity.js","runway-data.js","runways.js","app-config.js","manifest.webmanifest","sw.js","firestore.rules","assets/icon-192.png","assets/icon-512.png","assets/favicon-32.png"}.issubset(files)
             manifest=json.loads(package.read("manifest.webmanifest"))
             assert manifest["name"]=="Demo Air Charter"
             config=package.read("app-config.js").decode()
