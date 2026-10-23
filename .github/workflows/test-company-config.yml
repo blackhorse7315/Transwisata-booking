@@ -50,6 +50,8 @@ jobs:
         with:
           name: company-builder-tests
           path: |
+            work/charter-booking-requests.csv
+            work/charter-booking-requests.pdf
             work/company-builder.png
             work/multi-city-mobile.png
             work/navigation-admin.png
