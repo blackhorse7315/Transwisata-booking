@@ -157,6 +157,7 @@ ERANG S06 06'54" E106 09'14"
 SOBAR S06 13'07" E106 28'25"
 BUDIT S06 17'32" E106 33'57"
 GOLFI S06 16'43" E106 38'59" """
+        page.evaluate("showPage('admin')")
         page.locator("#navVfrBulkInput").fill(bulk_text)
         assert page.locator("#navVfrBulkPreview tbody tr").count()==6
         result=page.evaluate("""async text=>{
