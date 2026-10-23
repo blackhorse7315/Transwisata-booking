@@ -815,8 +815,45 @@ function offlineMap(points){
  const lines=points.slice(1).map((p,i)=>{const pts=greatCirclePoints(points[i],p);return `<polyline points="${pts.map(z=>x(z[1]).toFixed(1)+','+y(z[0]).toFixed(1)).join(' ')}" fill="none" stroke="#1165bd" stroke-width="3" stroke-dasharray="8 5" vector-effect="non-scaling-stroke"/>`}).join('');
  const markers=points.map((p,i)=>`<circle cx="${x(p[4])}" cy="${y(p[3])}" r="2.2" fill="${i===0?'#d6a34e':window.isVFRPoint?.(p)?'#b36414':'#144e81'}" stroke="white" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="${x(p[4])+6}" y="${y(p[3])-7}" font-size="5" font-family="Arial,sans-serif" font-weight="700" fill="#142c44" stroke="white" stroke-width="1" paint-order="stroke" stroke-linejoin="round">${esc(p[0])}</text>`).join('');
  const vb=[x(west),y(north),Math.max(80,(east-west)*8),Math.max(80,(north-south)*6)].join(' ');
- return `<svg viewBox="${vb}" style="width:100%;height:340px;background:#d9eef9;border-radius:12px" role="img" aria-label="Offline geographic map of Indonesia and Asia showing proposed route"><g fill="none" stroke="#86a6a4" stroke-width="1.3" vector-effect="non-scaling-stroke">${offlineCoastSVG}</g>${lines}${markers}</svg><div class="small" style="padding:8px">Offline geographic map · blue airport markers / amber VFR waypoints · VFR points are not landing or refuel stops · not for navigation</div>`;
+ return `<div class="route-zoom-map" style="border-radius:12px;overflow:hidden;background:#d9eef9"><div role="group" aria-label="Route map zoom controls" style="display:flex;align-items:center;gap:8px;padding:8px;background:#eff8fd"><button type="button" class="btn secondary" style="padding:8px 13px" aria-label="Zoom in route map" onclick="routeMapZoom(this,1.5)">＋</button><button type="button" class="btn secondary" style="padding:8px 13px" aria-label="Zoom out route map" onclick="routeMapZoom(this,1/1.5)">−</button><button type="button" class="btn secondary" style="padding:8px 13px" onclick="routeMapReset(this)">Reset</button><span class="route-zoom-level small" aria-live="polite">100%</span></div><svg class="route-zoom-svg" data-initial-viewbox="${vb}" data-zoom="1" viewBox="${vb}" tabindex="0" onkeydown="routeMapKey(event)" style="display:block;width:100%;height:340px;background:#d9eef9;touch-action:none;cursor:grab" role="img" aria-label="Interactive route map. Use zoom controls and drag to pan."><g fill="none" stroke="#86a6a4" stroke-width="1.3" vector-effect="non-scaling-stroke">${offlineCoastSVG}</g>${lines}${markers}</svg></div><div class="small" style="padding:8px">Use ＋ / − to zoom and drag the map to move. Blue airport markers / amber VFR waypoints · VFR points are not landing or refuel stops · not for navigation.</div>`;
 }
+
+function routeMapZoom(control,factor){
+ const map=control.closest('.route-zoom-map'),svg=map?.querySelector('.route-zoom-svg');if(!svg)return;
+ const original=svg.dataset.initialViewbox.split(' ').map(Number),v=svg.viewBox.baseVal,zoom=Number(svg.dataset.zoom)||1,next=Math.min(16,Math.max(.5,zoom*factor));
+ const width=original[2]/next,height=original[3]/next,x=v.x+v.width/2-width/2,y=v.y+v.height/2-height/2;
+ svg.setAttribute('viewBox',[x,y,width,height].join(' '));svg.dataset.zoom=String(next);map.querySelector('.route-zoom-level').textContent=Math.round(next*100)+'%';
+ map.querySelector('[aria-label="Zoom in route map"]').disabled=next>=16;map.querySelector('[aria-label="Zoom out route map"]').disabled=next<=.5;
+}
+function routeMapReset(control){
+ const map=control.closest('.route-zoom-map'),svg=map?.querySelector('.route-zoom-svg');if(!svg)return;
+ svg.setAttribute('viewBox',svg.dataset.initialViewbox);svg.dataset.zoom='1';map.querySelector('.route-zoom-level').textContent='100%';
+ map.querySelectorAll('button').forEach(button=>button.disabled=false);
+}
+function routeMapKey(event){
+ const svg=event.target;if(!svg.classList.contains('route-zoom-svg'))return;
+ if(['+','=','-','0'].includes(event.key)){event.preventDefault();if(event.key==='0')routeMapReset(svg);else routeMapZoom(svg,event.key==='-'?1/1.5:1.5);return}
+ const directions={ArrowLeft:[-.1,0],ArrowRight:[.1,0],ArrowUp:[0,-.1],ArrowDown:[0,.1]},move=directions[event.key];if(!move)return;
+ event.preventDefault();const v=svg.viewBox.baseVal;svg.setAttribute('viewBox',[v.x+v.width*move[0],v.y+v.height*move[1],v.width,v.height].join(' '));
+}
+let routeMapDrag=null;
+document.addEventListener('pointerdown',event=>{
+ const svg=event.target.closest?.('.route-zoom-svg');if(!svg||event.button!==0||routeMapDrag)return;
+ const matrix=svg.getScreenCTM();if(!matrix)return;
+ const v=svg.viewBox.baseVal,inverse=matrix.inverse();routeMapDrag={svg,id:event.pointerId,x:event.clientX,y:event.clientY,view:[v.x,v.y,v.width,v.height],scaleX:inverse.a,scaleY:inverse.d};
+ svg.setPointerCapture(event.pointerId);svg.style.cursor='grabbing';event.preventDefault();
+});
+document.addEventListener('pointermove',event=>{
+ const drag=routeMapDrag;if(!drag||drag.id!==event.pointerId)return;
+ const x=drag.view[0]-(event.clientX-drag.x)*drag.scaleX,y=drag.view[1]-(event.clientY-drag.y)*drag.scaleY;
+ drag.svg.setAttribute('viewBox',[x,y,drag.view[2],drag.view[3]].join(' '));
+});
+function finishRouteMapDrag(event){
+ const drag=routeMapDrag;if(!drag||drag.id!==event.pointerId)return;
+ drag.svg.style.cursor='grab';if(drag.svg.hasPointerCapture(event.pointerId))drag.svg.releasePointerCapture(event.pointerId);routeMapDrag=null;
+}
+document.addEventListener('pointerup',finishRouteMapDrag);document.addEventListener('pointercancel',finishRouteMapDrag);
+
 function routePlanningHTML(plan){
  if(!plan.ok)return `<div style="padding:13px;background:#fff1e7;border-radius:10px;color:#813c12"><strong>Manual route planning required.</strong> ${esc(plan.reason)} Indicative max leg ${plan.maxNM.toFixed(0)} NM.</div>`;
  return `<div style="background:#edf5fb;padding:13px;border-radius:12px;margin:12px 0"><strong>${plan.source==='admin'?'Admin saved helicopter routing':'Automatic suggested routing'} (subject to Operations approval)</strong><p class="small">${plan.source==='admin'?'Admin-defined sectors (no 2h 15m limit)':(plan.maxLegHours?'Sector flight time < 2h 15m':'Endurance '+plan.lim.endurance+' h')+' · screening leg limit '+plan.maxNM.toFixed(0)+' NM '+(plan.maxLegHours?'(under 2h 15m)':'(75% endurance)')} · daily flight cap ${plan.lim.daily} h · ${plan.days} day(s)</p>${plan.overnights.length?'<p><strong>Proposed overnight: '+plan.overnights.map(o=>esc(o.airport[2])+' ('+esc(o.airport[0])+') after Day '+o.day).join('; ')+'</strong></p>':'<p>No overnight required under the daily airborne-hour screen.</p>'}${plan.legs.map((l,i)=>`<div style="padding:7px 0;border-bottom:1px solid #d8e3ed">Day ${l.day}: ${esc(l.from[0])} → ${esc(l.to[0])}${l.via?.length?' via '+l.via.map(esc).join(' → '):''} · ${l.nm.toFixed(0)} NM · ${timeLabel(l.hours)}${l.overnightBefore?' · Overnight before departure':''}${i<plan.legs.length-1?' · Proposed fuel stop':''}</div>`).join('')}<p class="small">Total proposed routing: ${plan.totalNM.toFixed(0)} NM · ${timeLabel(plan.totalHours)} airborne. Verify fuel reserve, terrain, permissions, border formalities, airport opening, fuel supply and crew duty limits.</p></div>`;
@@ -1120,6 +1157,16 @@ window.TWAFirebase={
   if(!window.TWAAdminVerified)throw Error('Admin sign-in required.');
   if(!['airports','vfrPoints'].includes(kind)||!/^[A-Z][A-Z0-9]{1,11}$/.test(code))throw Error('Invalid navigation entry identifier.');
   await setDoc(configs,{navigationDirectory:{[kind]:{[code]:value}}},{mergeFields:['navigationDirectory.'+kind+'.'+code]});
+ },
+ saveVFRPoints:async(records)=>{
+  if(!window.TWAAdminVerified)throw Error('Admin sign-in required.');
+  if(!Array.isArray(records)||records.length<1||records.length>500)throw Error('Enter 1–500 VFR points.');
+  const points={},fields=[];
+  for(const record of records){
+   if(!/^[A-Z][A-Z0-9]{1,11}$/.test(record.name)||typeof record.lat!=='number'||typeof record.lon!=='number'||!Number.isFinite(record.lat)||!Number.isFinite(record.lon)||Math.abs(record.lat)>90||Math.abs(record.lon)>180||points[record.name])throw Error('Invalid or duplicate VFR point.');
+   points[record.name]={name:record.name,lat:record.lat,lon:record.lon};fields.push('navigationDirectory.vfrPoints.'+record.name);
+  }
+  await setDoc(configs,{navigationDirectory:{vfrPoints:points}},{mergeFields:fields});
  },
  saveConfig:async(key,value)=>{if(!window.TWAAdminVerified)throw Error('Administrator authentication required');await setDoc(configs,{[key]:value},{merge:true})},
  uploadPhoto:async(reg,dataUrl)=>{
