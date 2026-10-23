@@ -6,7 +6,7 @@ const el=id=>document.getElementById(id),clone=x=>JSON.parse(JSON.stringify(x));
 const firebaseKeys=['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId','measurementId'];
 const textFields={companyName:'Nama perusahaan',appName:'Nama aplikasi / instalasi',tagline:'Tagline',eyebrow:'Teks di atas judul',heroTitle:'Judul halaman',heroText:'Deskripsi halaman',fleetTitle:'Judul daftar armada',fleetIntro:'Pengantar daftar armada',fleetNote:'Catatan operasional',footer:'Footer',bookLabel:'Menu booking',trackLabel:'Menu tracking',adminLabel:'Menu Admin',installLabel:'Tombol instalasi'};
 const colorFields={primary:'Warna utama',accent:'Warna tombol',background:'Latar halaman',text:'Warna teks'};
-const defaultFleet=aircraft.map(a=>({name:a[0],description:a[1],registration:a[2],type:isHelicopter(a[0])?'helicopter':'fixed',planningSpeed:assumptions[a[0]].speed,rateUSD:assumptions[a[0]].rate,burnLiters:assumptions[a[0]].burn*3.785411784,cruiseSpeed:fleetSpecs()[a[0]].speed,endurance:fleetSpecs()[a[0]].endurance,seats:fleetSpecs()[a[0]].seats,range:fleetSpecs()[a[0]].range,dailyHours:planningLimits[a[0]].daily,maxLegMinutes:135,active:true}));
+const defaultFleet=aircraft.map(a=>({name:a[0],description:a[1],registration:a[2],type:isHelicopter(a[0])?'helicopter':'fixed',planningSpeed:assumptions[a[0]].speed,rateUSD:assumptions[a[0]].rate,burnLiters:assumptions[a[0]].burn*3.785411784,cruiseSpeed:fleetSpecs()[a[0]].speed,endurance:fleetSpecs()[a[0]].endurance,seats:fleetSpecs()[a[0]].seats,range:fleetSpecs()[a[0]].range,dailyHours:planningLimits[a[0]].daily,minimumRunwayM:defaultMinimumRunway(a[0]),maxLegMinutes:135,active:true}));
 const defaults={version:1,companyName:'TRANSWISATA',appName:'Transwisata Private Aviation',tagline:'PRIVATE AVIATION',eyebrow:'EXCLUSIVE AIR CHARTER',heroTitle:'Your Journey. Our Commitment.',heroText:'Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.',fleetTitle:'Compare Aircraft & Prices',fleetIntro:'Prices update automatically from your route and travel details. Tap View Price Details to see the breakdown.',fleetNote:'Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.',footer:'© 2026 PT Transwisata Prima Aviation · No payment collected',bookLabel:'Book Flight',trackLabel:'Track Booking',adminLabel:'Admin',installLabel:'Install Aplikasi',primary:'#0b1b30',accent:'#d5a95c',background:'#f3f6fa',text:'#15243a',logoData:'',iconData:'',fleet:defaultFleet};
 window.TWACustomFleet=clone(defaultFleet);
 let liveConfig=clone(defaults),draftFleet=[],logoDraft='',iconDraft='';
@@ -24,6 +24,7 @@ function validateConfig(input){
   const r={name:String(row.name||'').trim(),description:String(row.description||'').trim(),registration:String(row.registration||'').trim().toUpperCase(),type:row.type,active:row.active!==false};
   if(!r.name||r.name.length>80||!r.name.match(/^[\p{L}\p{N} ._()+\/-]+$/u)||r.description.length>250||!r.registration.match(/^[A-Z0-9][A-Z0-9-]{1,19}$/)||r.name==='To be advised'||['__proto__','constructor','prototype'].includes(r.name.toLowerCase())||names.has(r.name.toLowerCase())||regs.has(r.registration)||!['helicopter','fixed'].includes(r.type))throw Error('Nama/registrasi pesawat harus unik dan valid.');
   names.add(r.name.toLowerCase());regs.add(r.registration);
+  r.minimumRunwayM=Number(row.minimumRunwayM??defaultMinimumRunway(r.name));if(!Number.isFinite(r.minimumRunwayM)||r.minimumRunwayM<0||r.minimumRunwayM>20000)throw Error('Minimum runway tidak valid.');
   for(const key of ['planningSpeed','rateUSD','burnLiters','cruiseSpeed','endurance','seats','range','dailyHours','maxLegMinutes']){
    r[key]=Number(row[key]);if(!Number.isFinite(r[key])||r[key]<0||r[key]>10000000)throw Error('Angka pesawat tidak valid: '+r.name+' / '+key);
   }
@@ -129,7 +130,7 @@ function fillForm(config,hydrate=false){
  for(const key of firebaseKeys)el('sa_fb_'+key).value=bootstrap.firebase?.[key]||'';
  el('saSuperUid').value=bootstrap.superAdminUid||'';el('saAdminUids').value=(bootstrap.adminUids||[]).join(',');
 }
-const fleetLabels={name:'Nama / model',registration:'Registrasi',description:'Deskripsi',planningSpeed:'Planning speed (kts)',rateUSD:'Charter USD/jam',burnLiters:'Fuel liter/jam',cruiseSpeed:'Cruise speed (kts)',endurance:'Endurance (HH:MM)',seats:'Kursi',range:'Max range (NM)',dailyHours:'Batas jam/hari',maxLegMinutes:'Batas leg otomatis (menit)'};
+const fleetLabels={name:'Nama / model',registration:'Registrasi',description:'Deskripsi',planningSpeed:'Planning speed (kts)',rateUSD:'Charter USD/jam',burnLiters:'Fuel liter/jam',cruiseSpeed:'Cruise speed (kts)',endurance:'Endurance (HH:MM)',seats:'Kursi',range:'Max range (NM)',dailyHours:'Batas jam/hari',maxLegMinutes:'Batas leg otomatis (menit)',minimumRunwayM:'Minimum runway fixed wing (meter)'};
 function captureFleetRows(){
  const rows=[];
  document.querySelectorAll('#saFleetRows .sa-fleet-row').forEach(node=>{
@@ -142,7 +143,7 @@ function drawFleetRows(){
  el('saFleetRows').innerHTML=draftFleet.map((r,i)=>'<div class="fleet-spec-admin-item sa-fleet-row"><h4>'+esc(r.name||'Pesawat baru')+'</h4><div class="costgrid">'+Object.entries(fleetLabels).map(([key,label])=>'<label>'+label+'<input data-field="'+key+'" '+(['name','registration','description','endurance'].includes(key)?'type="text"':'type="number" min="0" step="any"')+' value="'+esc(key==='endurance'?enduranceToHHMM(r[key]):r[key])+'"></label>').join('')+'<label>Jenis<select data-field="type"><option value="fixed" '+(r.type==='fixed'?'selected':'')+'>Fixed wing</option><option value="helicopter" '+(r.type==='helicopter'?'selected':'')+'>Helikopter</option></select></label><label>Aktif<input data-field="active" type="checkbox" '+(r.active?'checked':'')+' style="width:auto"></label></div><button type="button" class="btn secondary" data-remove="'+i+'">Hapus dari daftar</button></div>').join('');
  el('saFleetRows').querySelectorAll('[data-remove]').forEach(button=>button.onclick=()=>{draftFleet=captureFleetRows();draftFleet.splice(Number(button.dataset.remove),1);drawFleetRows()});
 }
-window.addSuperAdminAircraft=function(){draftFleet=captureFleetRows();draftFleet.push({name:'',registration:'',description:'',type:'fixed',planningSpeed:200,rateUSD:0,burnLiters:0,cruiseSpeed:200,endurance:3,seats:6,range:600,dailyHours:8,maxLegMinutes:135,active:true});drawFleetRows()};
+window.addSuperAdminAircraft=function(){draftFleet=captureFleetRows();draftFleet.push({name:'',registration:'',description:'',type:'fixed',planningSpeed:200,rateUSD:0,burnLiters:0,cruiseSpeed:200,endurance:3,seats:6,range:600,dailyHours:8,maxLegMinutes:135,minimumRunwayM:0,active:true});drawFleetRows()};
 function drawImages(){el('saImagePreview').innerHTML=[logoDraft,iconDraft].filter(Boolean).map(src=>'<img alt="Preview" src="'+src+'" style="height:80px;width:80px;object-fit:contain;margin:8px;background:white;border:1px solid #ddd">').join('')}
 window.loadSuperAdminImage=async function(input,kind){
  const file=input.files?.[0];if(!file)return;
@@ -197,8 +198,8 @@ window.exportCompanyApp=async function(){
  try{
   ensureSuper();const config=collectConfig(),bootstrap=companyBootstrap(config);message('Membuat paket perusahaan…');
   if(!window.JSZip){await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';script.onload=resolve;script.onerror=()=>reject(Error('Library ZIP gagal dimuat.'));document.head.append(script)})}
-  const zip=new window.JSZip(),[html,customJs,multiJs,sw,rules,originalLogo]=await Promise.all([readAsset('index.html'),readAsset('customization.js'),readAsset('multicity.js'),readAsset('sw.js'),readAsset('firestore.rules'),readAsset('assets/logo.png','blob')]);
-  zip.file('index.html',html);zip.file('customization.js',customJs);zip.file('multicity.js',multiJs);zip.file('app-config.js','window.TWA_BOOTSTRAP = '+JSON.stringify(bootstrap)+';');
+  const zip=new window.JSZip(),[html,customJs,multiJs,runwayData,runwayJs,sw,rules,originalLogo]=await Promise.all([readAsset('index.html'),readAsset('customization.js'),readAsset('multicity.js'),readAsset('runway-data.js'),readAsset('runways.js'),readAsset('sw.js'),readAsset('firestore.rules'),readAsset('assets/logo.png','blob')]);
+  zip.file('index.html',html);zip.file('customization.js',customJs);zip.file('multicity.js',multiJs);zip.file('runway-data.js',runwayData);zip.file('runways.js',runwayJs);zip.file('app-config.js','window.TWA_BOOTSTRAP = '+JSON.stringify(bootstrap)+';');
   zip.file('sw.js',sw.replace(/__BUILD_VERSION__/g,Date.now().toString()).replace(/transwisata-[a-f0-9]{40}/g,'transwisata-'+Date.now()));
   const source=config.iconData||config.logoData||URL.createObjectURL(originalLogo);
   try{
