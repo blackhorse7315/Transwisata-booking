@@ -55,7 +55,7 @@ async function refreshCompanyInstallManifest(config){
   if(revision!==companyInstallRevision)return;
   const registration=await navigator.serviceWorker.ready;if(!registration.active||revision!==companyInstallRevision)return;
   const channel=new MessageChannel();
-  await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Manifest update timed out')),5000);channel.port1.onmessage=()=>{clearTimeout(timeout);resolve()};registration.active.postMessage({type:'company-branding',branding:{name:config.appName,short_name:config.companyName.slice(0,20),theme_color:config.primary,background_color:config.background,icons}},[channel.port2])});
+  await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Manifest update timed out')),5000);channel.port1.onmessage=()=>{clearTimeout(timeout);resolve()};registration.active.postMessage({type:'company-branding',branding:{name:config.appName,short_name:config.appName,theme_color:config.primary,background_color:config.background,icons}},[channel.port2])});
   channel.port1.close();
   if(revision===companyInstallRevision)document.querySelector('link[rel="manifest"]').href=new URL('manifest.webmanifest?company='+Date.now(),location.href).href;
  }catch(error){console.warn('Company install manifest:',error.message)}
@@ -102,6 +102,8 @@ window.applyCompanyCustomization=function(input,options={}){
  const ids={companyName:'appCompanyName',tagline:'appTagline',eyebrow:'appEyebrow',heroTitle:'appHeroTitle',heroText:'appHeroText',fleetTitle:'appFleetTitle',fleetIntro:'appFleetIntro',fleetNote:'appFleetNote',footer:'appFooter',bookLabel:'appBookNav',trackLabel:'appTrackNav',adminLabel:'appAdminNav',installLabel:'appInstallButton'};
  for(const [key,id] of Object.entries(ids))setText(id,config[key]);
  document.title=config.webTitle;
+ document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content',config.appName);
+ document.querySelector('meta[name="application-name"]')?.setAttribute('content',config.appName);
  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',config.primary);
  let style=el('companyTheme');if(!style){style=document.createElement('style');style.id='companyTheme';document.head.append(style)}
  style.textContent='body{background:'+config.background+'!important;color:'+config.text+'}header,footer{background:'+config.primary+'!important}.hero{background:linear-gradient(110deg,'+config.primary+','+config.primary+'d9)!important}.btn:not(.secondary){background:'+config.accent+'!important}.tabs button.active{background:'+config.primary+'!important}.hero>div>span{color:'+config.accent+'!important}#fleet .fleet-detail{background:'+config.primary+'!important}#fleet .fleet-price{color:'+config.primary+'!important}.summary-strip.premium-route{background:'+config.primary+'!important}';
@@ -212,7 +214,7 @@ window.exportCompanyApp=async function(){
    zip.file('assets/logo.png',await pngIcon(config.logoData||source,512));
    for(const [name,size,mask] of [['favicon-32.png',32,false],['icon-192.png',192,false],['icon-512.png',512,false],['icon-maskable-512.png',512,true],['apple-touch-icon.png',180,false]])zip.file('assets/'+name,await pngIcon(source,size,mask));
   }finally{if(source.startsWith('blob:'))URL.revokeObjectURL(source)}
-  const manifest={id:'./',name:config.appName,short_name:config.companyName.slice(0,20),start_url:'./',scope:'./',display:'standalone',background_color:config.background,theme_color:config.primary,icons:[{src:'assets/icon-192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'assets/icon-512.png',sizes:'512x512',type:'image/png',purpose:'any'},{src:'assets/icon-maskable-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}]};
+  const manifest={id:'./',name:config.appName,short_name:config.appName,start_url:'./',scope:'./',display:'standalone',background_color:config.background,theme_color:config.primary,icons:[{src:'assets/icon-192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'assets/icon-512.png',sizes:'512x512',type:'image/png',purpose:'any'},{src:'assets/icon-maskable-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}]};
   zip.file('manifest.webmanifest',JSON.stringify(manifest,null,2));
   zip.file('firestore.rules',rules.replace(/function isSuperAdmin\(\)\s*\{\s*return signedIn\(\) && request.auth.uid == ['"][A-Za-z0-9_-]+['"];\s*\}/,'function isSuperAdmin() { return signedIn() && request.auth.uid == '+JSON.stringify(bootstrap.superAdminUid)+'; }').replace(/request.auth.uid in \[[^\]]*\]; \/\/ COMPANY_ADMIN_UIDS/,'request.auth.uid in '+JSON.stringify([...new Set([bootstrap.superAdminUid,...bootstrap.adminUids])])+'; // COMPANY_ADMIN_UIDS'));
   zip.file('README.txt','COMPANY APP PACKAGE\n1. Create Firebase Authentication accounts; enable Email/Password and Anonymous.\n2. Confirm UIDs in app-config.js and firestore.rules.\n3. Publish firestore.rules in the TARGET Firebase project.\n4. Upload all package files to an HTTPS static host. No build required.\n5. Sign in as Super Admin and Save Configuration to publish defaults to Firestore.\nThis package contains no customer records and does not migrate accounts or payments.\n');
