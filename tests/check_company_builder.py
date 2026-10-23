@@ -343,6 +343,8 @@ try:
         }""")
         assert page.evaluate("exportCSV()") is False
         assert page.evaluate("exportRequestsPDF()") is False
+        assert page.evaluate("deleteBookingRequest('TWA-REPORT-001')") is False
+        assert page.evaluate("requestDeleteWrites.length")==0
         page.evaluate("window.TWAAdminVerified=true;syncAdminView();showPage('admin');render()")
         assert page.locator("#records [data-delete-request]").count()==3
         assert page.locator("#records tr").first.locator("select").input_value()=="Awaiting Payment Instructions"
