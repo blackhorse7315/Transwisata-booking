@@ -29,7 +29,7 @@ function field(label,id,type,cls,value=''){
  const caption=document.createElement('label');caption.htmlFor=id;caption.textContent=label;
  const input=document.createElement('input');input.id=id;input.type=type;input.value=value;
  if(type==='text')input.placeholder=cls==='mc-origin'?'Select origin city/airport':'Select destination city/airport';
- if(type==='date')input.min=today();
+ if(type==='date'){const bounds=bookingWindow();input.min=bounds.minDate;input.max=bounds.maxDate;}
  holder.append(caption,input);if(type==='text')bindAirport(input);return holder;
 }
 function mountFirst(){for(const f of firstFields){f.holder.classList.add('mc-field',f.id==='from'?'mc-origin':f.id==='to'?'mc-destination':f.id==='date'?'mc-date':'mc-time');rows[0].node.querySelector('.mc-fields').append(f.holder)}}
@@ -37,7 +37,7 @@ function card(first=false,seed={}){
  const id=first?1:nextId++,node=document.createElement('article');node.className='mc-card';
  node.innerHTML='<div class="mc-head"><h3></h3><button type="button" class="mc-remove">Remove</button></div><div class="mc-fields"></div>';
  const area=node.querySelector('.mc-fields'),ids=first?{from:'from',to:'to',date:'date',time:'time'}:{from:'mcFrom'+id,to:'mcTo'+id,date:'mcDate'+id,time:'mcTime'+id};
- if(!first)area.append(field('Departure Airport / Location',ids.from,'text','mc-origin',seed.from),field('Destination Airport / Location',ids.to,'text','mc-destination',seed.to),field('Departure Date',ids.date,'date','mc-date',seed.date),field('Departure Time (Local)',ids.time,'time','mc-time',seed.time||'09:00'));
+ if(!first)area.append(field('Departure Airport / Location',ids.from,'text','mc-origin',seed.from),field('Destination Airport / Location',ids.to,'text','mc-destination',seed.to),field('Departure Date',ids.date,'date','mc-date',seed.date),field('Departure Time (WIB / UTC+7)',ids.time,'time','mc-time',seed.time||'09:00'));
  const swap=document.createElement('button');swap.type='button';swap.className='mc-swap';swap.textContent='⇅';swap.onclick=()=>{const a=el(ids.from),b=el(ids.to);[a.value,b.value]=[b.value,a.value];changed()};area.append(swap);
  const row={id,node,ids};node.querySelector('.mc-remove').onclick=()=>{if(rows.length<=2)return;rows=rows.filter(r=>r!==row);node.remove();renumber();changed()};
  rows.push(row);el('multiCityFlights').append(node);if(first)mountFirst();renumber();return row;
@@ -48,7 +48,7 @@ function problem(){
  const flights=getMultiCityFlights();if(flights.length<2)return 'Add at least two flights.';
  for(let i=0;i<flights.length;i++){const f=flights[i],a=airportMatch(f.from),b=airportMatch(f.to);
   if(!a||!b||a===b)return 'Flight '+(i+1)+': select different supported origin and destination airports.';
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(f.date)||f.date<today()||!f.time)return 'Flight '+(i+1)+': enter a valid departure date and time.';
+  const dateError=departureDateError(f.date,f.time);if(dateError)return 'Flight '+(i+1)+': '+dateError;
   if(i&&f.date<flights[i-1].date)return 'Flight '+(i+1)+': departure date must follow the previous flight.';
   if(i&&f.date===flights[i-1].date&&f.time<=flights[i-1].time)return 'Flight '+(i+1)+': departure time must be later than the previous flight on the same date.';
  }
@@ -56,7 +56,7 @@ function problem(){
 }
 function serialize(){el('stops').value=JSON.stringify({version:1,flights:getMultiCityFlights().map(f=>({...f,from:airportMatch(f.from)?.[0]||f.from,to:airportMatch(f.to)?.[0]||f.to}))})}
 window.validateMultiCity=function(show=false){const error=problem();if(show)el('multiCityError').textContent=error;if(!error)serialize();return !error};
-function changed(){if(currentTrip!=='Multi City')return;serialize();window.calculateEstimate()}
+function changed(){refreshBookingDateLimits();if(currentTrip!=='Multi City')return;serialize();window.calculateEstimate()}
 editor.addEventListener('input',changed);editor.addEventListener('change',changed);
 el('multiCityAdd').onclick=()=>{if(rows.length>=MAX)return;const last=getMultiCityFlights().at(-1);card(false,{from:last?.to||'',date:last?.date||''});changed();rows.at(-1).node.scrollIntoView({behavior:'smooth',block:'center'})};
 el('multiCitySearch').onclick=()=>{if(!validateMultiCity(true))return;window.calculateEstimate();el('fleet').scrollIntoView({behavior:'smooth',block:'start'})};
@@ -122,7 +122,7 @@ window.showPriceDetails=function(index){
  el('priceModalContent').innerHTML='<h3>Multi City itinerary</h3>'+itineraryHTML(p.flights)+p.quotes.map((q,i)=>'<details'+(i===0?' open':'')+'><summary>Flight '+(i+1)+': '+esc(q.route)+' · '+timeLabel(q.hours)+'</summary><div class="route-map">'+offlineMap(q.plan?q.plan.points:[airportMatch(p.flights[i].from),airportMatch(p.flights[i].to)])+'</div>'+(q.plan?routePlanningHTML(q.plan):'')+'</details>').join('')+p.positions.map(pos=>'<p class="mc-itinerary"><strong>Aircraft positioning before Flight '+pos.flight+': '+esc(pos.quote.route)+'</strong><br>'+timeLabel(pos.quote.hours)+' · included in total</p>').join('')+'<h3>All flights · estimated price breakdown</h3>'+p.items.map(x=>'<div class="costrow"><span>'+esc(x[0])+'</span><strong>'+formatPrice(x[1])+'</strong></div>').join('')+'<div class="modal-total">Estimated total: '+formatPrice(p.total)+'</div><p class="small">Includes all entered flights and proposed refuel sectors. Confirm schedules, aircraft performance, fuel supply, ground time, overnight costs and permits with Operations.</p>';
  el('modalBookButton').onclick=()=>{closePriceDetails();choose(entry[0])};el('priceModal').classList.remove('hidden');
 };
-window.next=function(){if(currentTrip==='Multi City'){if(!validateMultiCity(true))return;if(+el('pax').value<1)return alert('Enter a valid passenger count.');if(!el('plane').value)return alert('Please select an aircraft to view its estimate.');if(!window.priceForAircraft(el('plane').value))return alert('Adjust the itinerary or aircraft to meet route and daily flight limits.');el('contact').classList.remove('hidden');el('contact').scrollIntoView({behavior:'smooth'});return}return original.next()};
+window.next=function(){if(!validateBookingDates(true))return;if(currentTrip==='Multi City'){if(!validateMultiCity(true))return;if(+el('pax').value<1)return alert('Enter a valid passenger count.');if(!el('plane').value)return alert('Please select an aircraft to view its estimate.');if(!window.priceForAircraft(el('plane').value))return alert('Adjust the itinerary or aircraft to meet route and daily flight limits.');el('contact').classList.remove('hidden');el('contact').scrollIntoView({behavior:'smooth'});return}return original.next()};
 window.renderPaymentSummary=function(){original.payment();const b=getData().find(x=>x.ref===activePaymentRef);if(b?.trip==='Multi City')el('paymentSummary').insertAdjacentHTML('beforeend',bookingRouteHTML(b))};
 window.track=function(){original.track();const b=getData().find(x=>x.ref.toUpperCase()===el('reference').value.trim().toUpperCase());if(b?.trip==='Multi City')el('tracking').insertAdjacentHTML('beforeend',bookingRouteHTML(b))};
 [...new Set([...costIds,'from','to','date','time','pax','returnDate'])].forEach(id=>el(id).addEventListener('input',changed));

@@ -288,6 +288,42 @@ try:
             }
         }""")
         print("HOLD_ON_CONTINUE_ONLY_CHECKS",json.dumps(result))
+
+        result=page.evaluate("""async()=>{
+            const fixed=Date.parse('2026-10-23T03:00:00Z'),realNow=Date.now,fields=['from','to','date','time','returnDate','plane'];
+            const saved=Object.fromEntries(fields.map(id=>[id,document.getElementById(id).value])),realFirebase=window.TWAFirebase;
+            const set=(id,value)=>document.getElementById(id).value=value,tab=name=>Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent===name);
+            let reserves=0;Date.now=()=>fixed;window.TWAFirebase={reserveAircraft:async()=>{reserves++}};
+            try{
+                const bounds=bookingWindow();
+                if(bounds.minDate!=='2026-10-23'||bounds.minTime!=='12:00'||bounds.maxDate!=='2026-11-06')throw Error('Wrong Jakarta booking window');
+                if(departureDateError('2026-10-23','12:00')||departureDateError('2026-11-06','23:59'))throw Error('Inclusive lead-time/last-day boundary rejected');
+                if(!departureDateError('2026-10-23','11:59')||!departureDateError('2026-11-07','00:00')||!departureDateError('2026-10-22','23:00')||!departureDateError('2026-02-30','12:00'))throw Error('Invalid ETD accepted');
+                if(bookingWindow(Date.parse('2026-10-23T15:30:00Z')).minDate!=='2026-10-24'||bookingWindow(Date.parse('2026-10-23T15:30:00Z')).minTime!=='00:30')throw Error('WIB midnight rollover failed');
+                if(departureDateError('2026-10-23','12:00',fixed+1000)==='')throw Error('Seconds below two-hour lead accepted');
+                trip('One Way',tab('One Way'));set('from','HLP');set('to','SUB');set('plane','King Air 350i');set('date','2026-11-07');set('time','12:00');refreshBookingDateLimits();updateRoute();
+                if(document.getElementById('date').max!=='2026-11-06'||validateBookingDates(true)||priceForAircraft('King Air 350i')!==null)throw Error('One Way date cap missing');
+                if(!document.getElementById('bookingDateError').textContent.includes('14 hari'))throw Error('Visible date-limit explanation missing');
+                if(await choose('King Air 350i')!==false||await holdAircraft('King Air 350i')!==false||submitBooking()!==false||reserves)throw Error('Invalid date reached hold/submission');
+                document.getElementById('contact').classList.add('hidden');next();if(!document.getElementById('contact').classList.contains('hidden'))throw Error('Invalid date reached contact form');
+                set('date','2026-10-23');set('time','11:59');refreshBookingDateLimits();
+                if(validateBookingDates(true)||!document.getElementById('bookingDateError').textContent.includes('2 jam'))throw Error('Same-day lead explanation missing');
+                set('time','12:00');refreshBookingDateLimits();if(!validateBookingDates()||document.getElementById('time').min!=='12:00')throw Error('Two-hour ETD or time picker incorrect');
+                trip('Round Trip',tab('Round Trip'));set('returnDate','2026-11-07');if(validateBookingDates(true))throw Error('Return exceeds 14 days');
+                set('returnDate','2026-11-06');if(!validateBookingDates())throw Error('Valid Round Trip rejected');
+                trip('Multi City',tab('Multi City'));set('from','HLP');set('to','SUB');set('date','2026-10-23');set('time','12:00');set('mcFrom2','SUB');set('mcTo2','DPS');set('mcDate2','2026-11-07');set('mcTime2','12:00');refreshBookingDateLimits();
+                if(validateMultiCity(true)||validateBookingDates(true)||document.getElementById('mcDate2').max!=='2026-11-06')throw Error('Multi City date cap missing');
+                set('mcDate2','2026-10-23');set('mcTime2','11:59');if(validateMultiCity())throw Error('Multi City time lead bypassed');
+                set('mcTime2','15:00');if(!validateMultiCity())throw Error('Valid Multi City window rejected');
+                return {max14Days:true,min2Hours:true,oneWay:true,roundTrip:true,multiCity:true,noInvalidHoldOrSubmission:true,timezone:'Asia/Jakarta',midnight:true};
+            }finally{
+                Date.now=realNow;window.TWAFirebase=realFirebase;trip('One Way',tab('One Way'));
+                for(const [id,value] of Object.entries(saved))set(id,value);
+                refreshBookingDateLimits();calculateEstimate();document.getElementById('contact').classList.add('hidden');
+            }
+        }""")
+        print("BOOKING_WINDOW_CHECKS",json.dumps(result))
+
         assert not errors, errors
 
         page.evaluate("showPage('superAdmin')")
