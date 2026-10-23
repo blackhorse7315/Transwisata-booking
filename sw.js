@@ -1,6 +1,6 @@
 const CACHE='transwisata-__BUILD_VERSION__';
 const base=new URL('./',self.location.href);
-const assets=['./','customization.js','multicity.js','runway-data.js','runways.js','app-config.js','manifest.webmanifest','assets/favicon-32.png','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable-512.png','assets/apple-touch-icon.png','assets/logo.png'].map(p=>new URL(p,base).href);
+const assets=['./','customization.js','multicity.js','runway-data.js','runways.js','navigation.js','app-config.js','manifest.webmanifest','assets/favicon-32.png','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable-512.png','assets/apple-touch-icon.png','assets/logo.png'].map(p=>new URL(p,base).href);
 
 function brandDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open('company-branding-'+self.registration.scope,1);request.onupgradeneeded=()=>request.result.createObjectStore('settings');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
 async function getBrand(){const db=await brandDB();try{return await new Promise((resolve,reject)=>{const request=db.transaction('settings').objectStore('settings').get('public');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}finally{db.close()}}

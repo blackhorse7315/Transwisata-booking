@@ -32,7 +32,7 @@ function markup(check){
  return '<div class="runway-notice" role="status"><strong>'+(!check.eligible?title:'Minimum runway: '+check.minimumM.toLocaleString('en-US')+' m')+'</strong>'+check.issues.map(i=>'<p>'+esc(i.message)+'</p>').join('')+'</div>';
 }
 function details(check){
- return markup(check)+'<p class="small">Runway-length screening uses the longest open runway listed in '+esc(reference().source)+' (snapshot '+esc(reference().sourceDate)+'). This company minimum does not establish take-off or landing performance approval. Operations must verify current AIP/NOTAM, declared distances, runway condition, aircraft weight, weather and performance before flight.</p>';
+ return markup(check)+'<p class="small">Runway-length screening uses Admin-entered runway lengths where configured, otherwise the longest open runway listed in '+esc(reference().source)+' (snapshot '+esc(reference().sourceDate)+'). This company minimum does not establish take-off or landing performance approval. Operations must verify current AIP/NOTAM, declared distances, runway condition, aircraft weight, weather and performance before flight.</p>';
 }
 function guard(name){
  const check=checkRunwayCompatibility(name);if(check.eligible)return true;

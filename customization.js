@@ -200,8 +200,8 @@ window.exportCompanyApp=async function(){
  try{
   ensureSuper();const config=collectConfig(),bootstrap=companyBootstrap(config);message('Membuat paket perusahaan…');
   if(!window.JSZip){await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';script.onload=resolve;script.onerror=()=>reject(Error('Library ZIP gagal dimuat.'));document.head.append(script)})}
-  const zip=new window.JSZip(),[html,customJs,multiJs,runwayData,runwayJs,sw,rules,originalLogo]=await Promise.all([readAsset('index.html'),readAsset('customization.js'),readAsset('multicity.js'),readAsset('runway-data.js'),readAsset('runways.js'),readAsset('sw.js'),readAsset('firestore.rules'),readAsset('assets/logo.png','blob')]);
-  zip.file('index.html',html);zip.file('customization.js',customJs);zip.file('multicity.js',multiJs);zip.file('runway-data.js',runwayData);zip.file('runways.js',runwayJs);zip.file('app-config.js','window.TWA_BOOTSTRAP = '+JSON.stringify(bootstrap)+';');
+  const zip=new window.JSZip(),[html,customJs,multiJs,runwayData,runwayJs,navJs,sw,rules,originalLogo]=await Promise.all([readAsset('index.html'),readAsset('customization.js'),readAsset('multicity.js'),readAsset('runway-data.js'),readAsset('runways.js'),readAsset('navigation.js'),readAsset('sw.js'),readAsset('firestore.rules'),readAsset('assets/logo.png','blob')]);
+  zip.file('index.html',html);zip.file('customization.js',customJs);zip.file('multicity.js',multiJs);zip.file('runway-data.js',runwayData);zip.file('runways.js',runwayJs);zip.file('navigation.js',navJs);zip.file('app-config.js','window.TWA_BOOTSTRAP = '+JSON.stringify(bootstrap)+';');
   zip.file('sw.js',sw.replace(/__BUILD_VERSION__/g,Date.now().toString()).replace(/transwisata-[a-f0-9]{40}/g,'transwisata-'+Date.now()));
   const source=config.iconData||config.logoData||URL.createObjectURL(originalLogo);
   try{

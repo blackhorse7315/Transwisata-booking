@@ -303,7 +303,7 @@ try:
         downloaded.save_as("work/company-app.zip")
         with zipfile.ZipFile("work/company-app.zip") as package:
             files=set(package.namelist())
-            assert {"index.html","customization.js","multicity.js","runway-data.js","runways.js","app-config.js","manifest.webmanifest","sw.js","firestore.rules","assets/icon-192.png","assets/icon-512.png","assets/favicon-32.png"}.issubset(files)
+            assert {"index.html","customization.js","multicity.js","runway-data.js","runways.js","navigation.js","app-config.js","manifest.webmanifest","sw.js","firestore.rules","assets/icon-192.png","assets/icon-512.png","assets/favicon-32.png"}.issubset(files)
             manifest=json.loads(package.read("manifest.webmanifest"))
             assert manifest["name"]=="Demo Air Charter"
             config=package.read("app-config.js").decode()
