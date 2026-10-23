@@ -23,6 +23,34 @@ try:
         page.wait_for_function("""async()=>{const link=document.querySelector('link[rel="icon"]');const img=new Image();img.src=link.href;await img.decode();return img.naturalWidth===32&&img.naturalHeight===32}""")
         print("DEFAULT_FAVICON_CHECK passed")
 
+
+        result=page.evaluate("""()=>{
+            const set=(id,value)=>document.getElementById(id).value=value;
+            set('from','HLP');set('to','SUB');set('plane','');
+            const original=window.priceForAircraft,calls=[];
+            window.priceForAircraft=(name,...args)=>{calls.push(name);return original(name,...args)};
+            try{
+                updateRoute();
+                if(calls.length||lastEstimate!==null||document.querySelectorAll('#fleet .fleet-price').length)throw Error('Unselected aircraft automatically priced');
+                set('plane','Gulfstream IV-SP');updatePlaneCosts();
+                if(!calls.length||calls.some(name=>name!=='Gulfstream IV-SP'))throw Error('Other aircraft priced with Gulfstream selected');
+                if(document.querySelectorAll('#fleet .fleet-price').length!==1||!lastEstimate)throw Error('Selected-only estimate missing');
+                calls.length=0;
+                showPriceDetails(1);
+                if(document.getElementById('plane').value!=='King Air 350i'||calls.some(name=>name!=='King Air 350i'))throw Error('Aircraft card did not select the requested estimate');
+                if(document.querySelectorAll('#fleet .fleet-price').length!==1)throw Error('Previous aircraft price remained visible');
+                if(Math.abs(lastEstimate.totalUSD-original('King Air 350i').total)>1e-6)throw Error('Estimate not switched to selected aircraft');
+                closePriceDetails();calls.length=0;
+                set('currency','USD');calculateEstimate();
+                if(calls.some(name=>name!=='King Air 350i'))throw Error('Currency change priced unselected aircraft');
+                calls.length=0;set('plane','');updatePlaneCosts();
+                if(calls.length||lastEstimate!==null||document.querySelectorAll('#fleet .fleet-price').length||document.getElementById('costRows').children.length)throw Error('Cleared selection retained prices');
+                set('currency','IDR');
+                return {noDefaultEstimate:true,selectedOnly:true,cardSelection:true,switching:true,clearSelection:true};
+            }finally{window.priceForAircraft=original;closePriceDetails()}
+        }""")
+        print("SELECTED_AIRCRAFT_PRICING_CHECKS",json.dumps(result))
+
         # Multi City uses each sector's airports and dates, then totals all movement costs.
         page.evaluate("""()=>{
             const set=(id,v)=>document.getElementById(id).value=v;
@@ -39,7 +67,10 @@ try:
         assert page.locator("#mcTo2").input_value()=="DPS"
         result=page.evaluate("""()=>{
             const set=(id,v)=>document.getElementById(id).value=v;
-            set('mcDate2',mcTestDate);set('mcTime2','15:00');calculateEstimate();
+            set('mcDate2',mcTestDate);set('mcTime2','15:00');set('plane','');calculateEstimate();
+            if(lastEstimate!==null||document.querySelectorAll('#fleet .fleet-price').length)throw Error('Multi City priced an unselected aircraft');
+            set('plane','Gulfstream IV-SP');calculateEstimate();
+            if(document.querySelectorAll('#fleet .fleet-price').length!==1)throw Error('Multi City shows other aircraft prices');
             if(!validateMultiCity(true))throw Error(document.getElementById('multiCityError').textContent);
             const name='Gulfstream IV-SP',p=priceForAircraft(name),a=assumptions[name];
             const nm=distanceNM(airportMatch('HLP'),airportMatch('SUB'))+distanceNM(airportMatch('SUB'),airportMatch('DPS'));
