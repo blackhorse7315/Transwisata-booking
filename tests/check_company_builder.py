@@ -222,6 +222,56 @@ try:
         print("RUNWAY_SCREENING_CHECKS",json.dumps(result))
         assert not errors, errors
 
+
+        result=page.evaluate("""async()=>{
+            const set=(id,value)=>document.getElementById(id).value=value;
+            const fieldIds=['from','to','date','time','pax','plane'];
+            const values=Object.fromEntries(fieldIds.map(id=>[id,document.getElementById(id).value]));
+            const previous={firebase:window.TWAFirebase,ready:window.TWAHoldsReady,holds:window.TWACloudHolds,owner:holdOwner,held:document.getElementById('plane').dataset.heldPlane||''};
+            let reserves=0,releases=0;
+            const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+            const select=async name=>{set('plane',name);document.getElementById('plane').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('plane').dispatchEvent(new Event('change',{bubbles:true}));await tick()};
+            window.TWAHoldsReady=true;window.TWACloudHolds={};holdOwner='test-hold-owner';document.getElementById('plane').dataset.heldPlane='';
+            window.TWAFirebase={
+                reserveAircraft:async(name)=>{reserves++;const value={plane:name,owner:holdOwner,status:'pending',expires:Date.now()+HOLD_MS};window.TWACloudHolds={...window.TWACloudHolds,[name]:value};return value},
+                releaseAircraft:async(name)=>{releases++;delete window.TWACloudHolds[name]}
+            };
+            try{
+                set('from','HLP');set('to','SUB');set('date',mcTestDate);set('time','09:00');set('pax','4');updateRoute();
+                await select('Gulfstream IV-SP');
+                if(reserves||releases||!lastEstimate||document.getElementById('holdNotice').querySelector('.holdbanner'))throw Error('Preferred Aircraft selection started a hold');
+                showPriceDetails(0);
+                if(reserves)throw Error('Opening price details started a hold');
+                document.getElementById('modalBookButton').click();await tick();
+                const held=cleanHolds()['Gulfstream IV-SP'];
+                if(reserves!==1||!held||held.expires-Date.now()>HOLD_MS||held.expires-Date.now()<HOLD_MS-2000||!document.getElementById('holdNotice').querySelector('.holdbanner')||document.getElementById('contact').classList.contains('hidden'))throw Error('Continue Booking did not start a five-minute hold');
+                await select('King Air 350i');
+                if(reserves!==1||releases!==1||document.getElementById('holdNotice').querySelector('.holdbanner')||!document.getElementById('contact').classList.contains('hidden'))throw Error('Changing quote created or retained an unintended hold');
+                showPriceDetails(1);
+                if(reserves!==1)throw Error('Viewing another quote created a hold');
+                closePriceDetails();set('date','');
+                if(await choose('King Air 350i')!==false||reserves!==1)throw Error('Incomplete itinerary reserved an aircraft');
+                set('date',mcTestDate);
+                trip('Multi City',Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Multi City'));
+                set('from','HLP');set('to','SUB');set('mcFrom2','SUB');set('mcTo2','DPS');set('mcDate2',mcTestDate);set('mcTime2','15:00');
+                await select('King Air 350i');
+                if(reserves!==1)throw Error('Multi City selection started a hold');
+                showPriceDetails(1);
+                if(reserves!==1)throw Error('Multi City details started a hold');
+                document.getElementById('modalBookButton').click();await tick();
+                if(reserves!==2||!cleanHolds()['King Air 350i']||document.getElementById('contact').classList.contains('hidden'))throw Error('Multi City Continue Booking did not start the hold');
+                return {quoteSelectionDoesNotReserve:true,priceDetailsDoNotReserve:true,continueStartsFiveMinuteHold:true,changedSelectionReleasesPriorHold:true,incompleteItineraryBlocked:true,multiCity:true};
+            }finally{
+                closePriceDetails();
+                trip('One Way',Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='One Way'));
+                for(const [id,value] of Object.entries(values))set(id,value);
+                window.TWAFirebase=previous.firebase;window.TWAHoldsReady=previous.ready;window.TWACloudHolds=previous.holds;holdOwner=previous.owner;
+                document.getElementById('plane').dataset.heldPlane=previous.held;document.getElementById('contact').classList.add('hidden');updateRoute();updateHoldUI();
+            }
+        }""")
+        print("HOLD_ON_CONTINUE_ONLY_CHECKS",json.dumps(result))
+        assert not errors, errors
+
         page.evaluate("showPage('superAdmin')")
         assert page.locator("#saGate").is_visible()
         assert not page.locator("#saWorkspace").is_visible()

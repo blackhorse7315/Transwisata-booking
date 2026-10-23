@@ -794,7 +794,17 @@ function showPriceDetails(index){
 }
 function closePriceDetails(){document.getElementById('priceModal').classList.add('hidden');}
 ['date','time','pax','returnDate'].forEach(id=>document.getElementById(id).addEventListener('input',renderFleetPrices));
-const aircraft=[['Gulfstream IV-SP','Executive jet','PK-TWY'],['King Air 350i','Turboprop charter','PK-TWX'],['CASA 212-200','Utility turboprop','PK-TWW'],['Bell 412EP','Twin-engine helicopter','PK-TWV'],['AW109S Grand','Executive helicopter','PK-TWZ']];document.getElementById('date').min=new Date().toLocaleDateString('en-CA');document.getElementById('returnDate').min=document.getElementById('date').min;document.getElementById('fleet').innerHTML=aircraft.map(a=>`<article class="aircraft"><div class="art">✈</div><div class="details"><span class="pill">${a[2]}</span><h3>${a[0]}</h3><p>${a[1]}</p></div></article>`).join('');applyFleetPhotos();async function choose(p){if(await holdAircraft(p)){next();closePriceDetails()}}function trip(t,b){currentTrip=t;document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById('returnBox').classList.toggle('hidden',t!=='Round Trip');document.getElementById('multi').classList.toggle('hidden',t!=='Multi City');calculateEstimate()}function showPage(p){['booking','track','admin','paymentPage','superAdmin'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==p));if(p==='admin'){syncAdminView();drawFleetSpecsAdmin();}if(p==='superAdmin'){window.syncSuperAdminView?.();}setTimeout(()=>document.getElementById(p).scrollIntoView({behavior:'smooth',block:'start'}),30)}function next(){if(!airportMatch(from.value)||!airportMatch(to.value)||!num('distance')||!date.value||!time.value||+pax.value<1){alert('Please complete the departure, destination, date, time and passenger fields.');return}if(currentTrip==='Round Trip'&&(!returnDate.value||returnDate.value<date.value)){alert('Please enter a valid return date.');return}document.getElementById('contact').classList.remove('hidden');document.getElementById('contact').scrollIntoView({behavior:'smooth'})}function getData(){if(window.TWAAdminVerified&&Array.isArray(window.TWACloudBookings))return window.TWACloudBookings;try{return JSON.parse(tenantStorage.getItem('twaBookings')||'[]')}catch{return []}}function submitBooking(){
+const aircraft=[['Gulfstream IV-SP','Executive jet','PK-TWY'],['King Air 350i','Turboprop charter','PK-TWX'],['CASA 212-200','Utility turboprop','PK-TWW'],['Bell 412EP','Twin-engine helicopter','PK-TWV'],['AW109S Grand','Executive helicopter','PK-TWZ']];document.getElementById('date').min=new Date().toLocaleDateString('en-CA');document.getElementById('returnDate').min=document.getElementById('date').min;document.getElementById('fleet').innerHTML=aircraft.map(a=>`<article class="aircraft"><div class="art">✈</div><div class="details"><span class="pill">${a[2]}</span><h3>${a[0]}</h3><p>${a[1]}</p></div></article>`).join('');applyFleetPhotos();async function choose(p){
+ if(p!==document.getElementById('plane').value)return false;
+ if(currentTrip==='Multi City'){if(!validateMultiCity(true))return false}
+ else if(!airportMatch(from.value)||!airportMatch(to.value)||!num('distance')||!date.value||!time.value||(currentTrip==='Round Trip'&&(!returnDate.value||returnDate.value<date.value))){
+  alert('Please complete the route, departure date and time, and return date where required before continuing.');return false;
+ }
+ if(!Number.isInteger(Number(pax.value))||Number(pax.value)<1){alert('Please enter a valid passenger count.');return false}
+ if(!priceForAircraft(p)){alert('This aircraft cannot cover the selected itinerary. Please review the route and aircraft requirements.');return false}
+ if(await holdAircraft(p)){next();closePriceDetails();return true}
+ return false;
+}function trip(t,b){currentTrip=t;document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById('returnBox').classList.toggle('hidden',t!=='Round Trip');document.getElementById('multi').classList.toggle('hidden',t!=='Multi City');calculateEstimate()}function showPage(p){['booking','track','admin','paymentPage','superAdmin'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==p));if(p==='admin'){syncAdminView();drawFleetSpecsAdmin();}if(p==='superAdmin'){window.syncSuperAdminView?.();}setTimeout(()=>document.getElementById(p).scrollIntoView({behavior:'smooth',block:'start'}),30)}function next(){if(!airportMatch(from.value)||!airportMatch(to.value)||!num('distance')||!date.value||!time.value||+pax.value<1){alert('Please complete the departure, destination, date, time and passenger fields.');return}if(currentTrip==='Round Trip'&&(!returnDate.value||returnDate.value<date.value)){alert('Please enter a valid return date.');return}document.getElementById('contact').classList.remove('hidden');document.getElementById('contact').scrollIntoView({behavior:'smooth'})}function getData(){if(window.TWAAdminVerified&&Array.isArray(window.TWACloudBookings))return window.TWACloudBookings;try{return JSON.parse(tenantStorage.getItem('twaBookings')||'[]')}catch{return []}}function submitBooking(){
  if(currentTrip==='Multi City'&&!validateMultiCity(true))return false;
  const field=id=>document.getElementById(id);
  const customerName=field('name').value.trim(), customerEmail=field('email').value.trim(), customerPhone=field('phone').value.trim();
@@ -802,7 +812,7 @@ const aircraft=[['Gulfstream IV-SP','Executive jet','PK-TWY'],['King Air 350i','
  const selectedPlane=field('plane').value;
  if(selectedPlane&&window.runwayAllowsBooking&&!window.runwayAllowsBooking(selectedPlane))return false;
  if(!window.TWAHoldsReady||!navigator.onLine){alert('Live availability is unavailable. Please reconnect before submitting.');return false}
- if(selectedPlane){const holds=cleanHolds(),existing=holds[selectedPlane];if(existing&&existing.owner!==holdOwner){alert('This aircraft is currently unavailable. Please choose another aircraft.');return false}if(!existing){alert('Please select an aircraft again to start a 5-minute hold.');return false}}
+ if(selectedPlane){const holds=cleanHolds(),existing=holds[selectedPlane];if(existing&&existing.owner!==holdOwner){alert('This aircraft is currently unavailable. Please choose another aircraft.');return false}if(!existing){alert('Please open the aircraft price details and click Select & Continue Booking to start a 5-minute hold.');return false}}
  const ref='TWA-'+Date.now().toString(36).toUpperCase();
  const item={ref,name:customerName,email:customerEmail,phone:customerPhone,company:field('company').value,from:field('from').value,to:currentTrip==='Multi City'?getMultiCityFlights().at(-1).to:field('to').value,date:field('date').value,time:field('time').value,pax:field('pax').value,plane:field('plane').value||'To be advised',purpose:field('purpose').value,trip:currentTrip,returnDate:field('returnDate').value,stops:field('stops').value,notes:field('notes').value,status:'Awaiting Payment Instructions',estimate:lastEstimate?{...lastEstimate}:null};
  try{tenantStorage.setItem('twaBookings',JSON.stringify([item,...getData()]));}catch(e){alert('Unable to save booking in this browser. Please check browser storage permissions.');return false}
@@ -951,7 +961,19 @@ function renderPaymentMethod(){const method=document.querySelector('input[name="
 function requestPaymentInstructions(){const method=document.querySelector('input[name="payMethod"]:checked')?.value;if(!method){alert('Please select QRIS, Bank Transfer, or Credit Card.');return}const b=getData().find(x=>x.ref===activePaymentRef),v=b&&cleanHolds()[b.plane];if(!v||v.owner!==holdOwner||v.status!=='pending'){alert('Your 5-minute booking hold has expired. Please select an available aircraft again.');return}const all=getData(),idx=all.findIndex(x=>x.ref===activePaymentRef);if(idx>=0){all[idx].paymentMethod=method;all[idx].paymentStatus='Awaiting official payment instructions';tenantStorage.setItem('twaBookings',JSON.stringify(all))}const box=document.getElementById('paymentMessage');box.style.display='block';box.textContent=method+' selected for '+activePaymentRef+'. No payment has been made or sent. Please contact Transwisata through its verified official channel to obtain payment instructions and final quotation.'}
 setInterval(updatePaymentTimer,1000);
 // Submission is handled directly by submitBooking(), which opens the payment page on success.
-const planeSelect=document.getElementById('plane');planeSelect.addEventListener('change',async()=>{const p=planeSelect.value;if(p){await holdAircraft(p)}else{await releaseMyHold();updatePlaneCosts();updateHoldUI()}});
+const planeSelect=document.getElementById('plane');
+planeSelect.addEventListener('change',async()=>{
+ // Aircraft selection is for quoting only. A reservation starts only on Select & Continue Booking.
+ document.getElementById('contact').classList.add('hidden');
+ closePriceDetails();updatePlaneCosts();
+ const previous=planeSelect.dataset.heldPlane||'';
+ if(previous&&previous!==planeSelect.value){
+  const existing=cleanHolds()[previous];
+  if(existing?.owner===holdOwner&&existing.status==='pending')await releaseMyHold();
+  else planeSelect.dataset.heldPlane='';
+ }
+ updateHoldUI();
+});
 window.addEventListener('online',updateHoldUI);window.addEventListener('offline',updateHoldUI);
 window.addEventListener('storage',updateHoldUI);
 setInterval(updateHoldUI,1000);
