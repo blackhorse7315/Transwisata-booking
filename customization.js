@@ -4,18 +4,22 @@
 'use strict';
 const el=id=>document.getElementById(id),clone=x=>JSON.parse(JSON.stringify(x));
 const firebaseKeys=['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId','measurementId'];
-const textFields={companyName:'Nama perusahaan',appName:'Nama aplikasi / instalasi',tagline:'Tagline',eyebrow:'Teks di atas judul',heroTitle:'Judul halaman',heroText:'Deskripsi halaman',fleetTitle:'Judul daftar armada',fleetIntro:'Pengantar daftar armada',fleetNote:'Catatan operasional',footer:'Footer',bookLabel:'Menu booking',trackLabel:'Menu tracking',adminLabel:'Menu Admin',installLabel:'Tombol instalasi'};
+const textFields={companyName:'Nama perusahaan',appName:'Nama aplikasi / instalasi',webTitle:'Judul tab web',tagline:'Tagline',eyebrow:'Teks di atas judul',heroTitle:'Judul halaman',heroText:'Deskripsi halaman',fleetTitle:'Judul daftar armada',fleetIntro:'Pengantar daftar armada',fleetNote:'Catatan operasional',footer:'Footer',bookLabel:'Menu booking',trackLabel:'Menu tracking',adminLabel:'Menu Admin',installLabel:'Tombol instalasi'};
 const colorFields={primary:'Warna utama',accent:'Warna tombol',background:'Latar halaman',text:'Warna teks'};
 const defaultFleet=aircraft.map(a=>({name:a[0],description:a[1],registration:a[2],type:isHelicopter(a[0])?'helicopter':'fixed',planningSpeed:assumptions[a[0]].speed,rateUSD:assumptions[a[0]].rate,burnLiters:assumptions[a[0]].burn*3.785411784,cruiseSpeed:fleetSpecs()[a[0]].speed,endurance:fleetSpecs()[a[0]].endurance,seats:fleetSpecs()[a[0]].seats,range:fleetSpecs()[a[0]].range,dailyHours:planningLimits[a[0]].daily,minimumRunwayM:defaultMinimumRunway(a[0]),maxLegMinutes:135,active:true}));
-const defaults={version:1,companyName:'TRANSWISATA',appName:'Transwisata Private Aviation',tagline:'PRIVATE AVIATION',eyebrow:'EXCLUSIVE AIR CHARTER',heroTitle:'Your Journey. Our Commitment.',heroText:'Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.',fleetTitle:'Aircraft & Charter Estimate',fleetIntro:'Select an aircraft to calculate the estimate for your itinerary.',fleetNote:'Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.',footer:'© 2026 PT Transwisata Prima Aviation · No payment collected',bookLabel:'Book Flight',trackLabel:'Track Booking',adminLabel:'Admin',installLabel:'Install Aplikasi',primary:'#0b1b30',accent:'#d5a95c',background:'#f3f6fa',text:'#15243a',logoData:'',iconData:'',fleet:defaultFleet};
+const defaults={version:1,companyName:'TRANSWISATA',appName:'TRANSWISATA PRIMA AVIATION',webTitle:'TRANSWISATA ONLINE BOOKING',tagline:'PRIMA AVIATION',eyebrow:'EXCLUSIVE AIR CHARTER',heroTitle:'Your Journey. Our Commitment.',heroText:'Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.',fleetTitle:'Aircraft & Charter Estimate',fleetIntro:'Select an aircraft to calculate the estimate for your itinerary.',fleetNote:'Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.',footer:'© 2026 PT Transwisata Prima Aviation · No payment collected',bookLabel:'Book Flight',trackLabel:'Track Booking',adminLabel:'Admin',installLabel:'Install Aplikasi',primary:'#0b1b30',accent:'#d5a95c',background:'#f3f6fa',text:'#15243a',logoData:'',iconData:'',fleet:defaultFleet};
 window.TWACustomFleet=clone(defaultFleet);
 let liveConfig=clone(defaults),draftFleet=[],logoDraft='',iconDraft='';
 const message=text=>{el('saStatus').textContent=text};
 function validImage(value){return value===''||/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)&&value.length<=85000}
 function validateConfig(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Konfigurasi tidak valid.');
+ const legacyName=/^transwisata private aviation$/i.test(input.appName||'');
+ input={...input,webTitle:input.webTitle??(legacyName?defaults.webTitle:input.appName)};
  const out={version:1};
  for(const key of Object.keys(textFields)){if(typeof input[key]!=='string'||input[key].length>1500)throw Error('Teks tidak valid: '+key);out[key]=input[key]}
+ if(legacyName)out.appName=defaults.appName;
+ if(/^transwisata$/i.test(out.companyName)&&out.tagline==='PRIVATE AVIATION')out.tagline=defaults.tagline;
  if(out.fleetTitle==='Compare Aircraft & Prices')out.fleetTitle='Aircraft & Charter Estimate';
  if(out.fleetIntro==='Prices update automatically from your route and travel details. Tap View Price Details to see the breakdown.')out.fleetIntro='Select an aircraft to calculate the estimate for your itinerary.';
  for(const key of Object.keys(colorFields)){if(!/^#[0-9a-f]{6}$/i.test(input[key]||''))throw Error('Warna tidak valid: '+key);out[key]=input[key]}
@@ -93,11 +97,11 @@ function applyFleet(config,preview=false){
  if(window.TWAAdminVerified){drawAdminCosts();drawFleetSpecsAdmin();drawFleetPhotoAdmin()}
 }
 window.applyCompanyCustomization=function(input,options={}){
- let config;try{config=validateConfig({...defaults,...input})}catch(error){console.error('Company configuration:',error.message);return}
+ let config;try{config=validateConfig({...defaults,...input,webTitle:input?.webTitle})}catch(error){console.error('Company configuration:',error.message);return}
  liveConfig=config;
  const ids={companyName:'appCompanyName',tagline:'appTagline',eyebrow:'appEyebrow',heroTitle:'appHeroTitle',heroText:'appHeroText',fleetTitle:'appFleetTitle',fleetIntro:'appFleetIntro',fleetNote:'appFleetNote',footer:'appFooter',bookLabel:'appBookNav',trackLabel:'appTrackNav',adminLabel:'appAdminNav',installLabel:'appInstallButton'};
  for(const [key,id] of Object.entries(ids))setText(id,config[key]);
- document.title=config.appName;
+ document.title=config.webTitle;
  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',config.primary);
  let style=el('companyTheme');if(!style){style=document.createElement('style');style.id='companyTheme';document.head.append(style)}
  style.textContent='body{background:'+config.background+'!important;color:'+config.text+'}header,footer{background:'+config.primary+'!important}.hero{background:linear-gradient(110deg,'+config.primary+','+config.primary+'d9)!important}.btn:not(.secondary){background:'+config.accent+'!important}.tabs button.active{background:'+config.primary+'!important}.hero>div>span{color:'+config.accent+'!important}#fleet .fleet-detail{background:'+config.primary+'!important}#fleet .fleet-price{color:'+config.primary+'!important}.summary-strip.premium-route{background:'+config.primary+'!important}';
