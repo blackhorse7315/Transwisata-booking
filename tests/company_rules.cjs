@@ -1,6 +1,6 @@
 const fs=require('node:fs');
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
-const {doc,setDoc,getDoc,updateDoc,serverTimestamp}=require('firebase/firestore');
+const {doc,setDoc,getDoc,updateDoc,deleteDoc,serverTimestamp}=require('firebase/firestore');
 (async()=>{
  const source=fs.readFileSync('firestore.rules','utf8');
  const env=await initializeTestEnvironment({projectId:'demo-company-builder',firestore:{rules:source,host:'127.0.0.1',port:8080}});
@@ -51,6 +51,17 @@ const {doc,setDoc,getDoc,updateDoc,serverTimestamp}=require('firebase/firestore'
   await assertSucceeds(setDoc(doc(admin,'publicFleetPhotos','ZZ-TEST'),{url:'data:image/jpeg;base64,AAAA',updatedAt:serverTimestamp()}));
   await assertSucceeds(getDoc(doc(guest,'publicFleetPhotos','ZZ-TEST')));
   await assertFails(setDoc(doc(visitor,'publicFleetPhotos','ZZ-TEST'),{url:'bad'}));
+  await env.withSecurityRulesDisabled(async ctx=>{
+   await setDoc(doc(ctx.firestore(),'bookingRequests','TWA-DELETE-ADMIN'),{ref:'TWA-DELETE-ADMIN',name:'Delete fixture',createdBy:'visitor-a'});
+   await setDoc(doc(ctx.firestore(),'bookingRequests','TWA-DELETE-SUPER'),{ref:'TWA-DELETE-SUPER',name:'Delete fixture',createdBy:'visitor-a'});
+   await setDoc(doc(ctx.firestore(),'bookingRequests','TWA-KEEP'),{ref:'TWA-KEEP',name:'Keep fixture',createdBy:'visitor-a'});
+  });
+  await assertFails(deleteDoc(doc(visitor,'bookingRequests','TWA-DELETE-ADMIN')));
+  await assertFails(deleteDoc(doc(guest,'bookingRequests','TWA-DELETE-ADMIN')));
+  await assertSucceeds(deleteDoc(doc(admin,'bookingRequests','TWA-DELETE-ADMIN')));
+  await assertSucceeds(deleteDoc(doc(root,'bookingRequests','TWA-DELETE-SUPER')));
+  if((await getDoc(doc(admin,'bookingRequests','TWA-DELETE-ADMIN'))).exists()||!(await getDoc(doc(admin,'bookingRequests','TWA-KEEP'))).exists())throw Error('Booking deletion affected the wrong reference');
+  console.log('BOOKING_REQUEST_DELETE_RULES_CHECKS passed');
   console.log('SUPER_ADMIN_RULES_CHECKS passed');
  }finally{await env.cleanup()}
 })().catch(error=>{console.error(error);process.exitCode=1});
