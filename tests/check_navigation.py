@@ -63,6 +63,38 @@ try:
             set('heliRouteFrom','HLP');set('heliRouteTo','TKG');set('heliRouteAircraft','both');set('heliRouteSequence',codes.join('-'));
             document.getElementById('heliRouteReverse').checked=true;await saveHelicopterRoute();
             if(Object.values(getHelicopterRoutes()).filter(Boolean).length!==4)throw Error('Helicopter/reverse routes not persisted');
+            const originalRoutes=JSON.parse(JSON.stringify(getHelicopterRoutes())),editKey=helicopterRouteKey('Bell 412EP','HLP','TKG'),returnKey=helicopterRouteKey('Bell 412EP','TKG','HLP'),otherKey=helicopterRouteKey('AW109S Grand','HLP','TKG');
+            const saveFunction=window.TWAFirebase.saveConfig;let editWrites=0;
+            const countedSave=async(key,value)=>{editWrites++;return saveFunction(key,value)};
+            window.TWAFirebase.saveConfig=countedSave;
+            try{
+                document.getElementById('editHeliRoute0').click();
+                if(document.getElementById('heliRouteAircraft').value!=='Bell 412EP'||document.getElementById('heliRouteFrom').value!=='HLP'||document.getElementById('heliRouteTo').value!=='TKG'||document.getElementById('heliRouteSequence').value!==codes.join('-')||document.getElementById('cancelHeliRouteEdit').hidden||document.getElementById('heliRouteReverse').checked)throw Error('Edit row did not load the helicopter and VFR route');
+                set('heliRouteSequence','HLP-PIMOL-TKG');document.getElementById('cancelHeliRouteEdit').click();
+                if(editWrites||JSON.stringify(getHelicopterRoutes())!==JSON.stringify(originalRoutes)||!document.getElementById('cancelHeliRouteEdit').hidden)throw Error('Cancel Edit changed stored routes');
+                document.getElementById('editHeliRoute0').click();
+                const edited=['HLP','PIMOL','ERANG','MERAK','GUSAN','TKG'];set('heliRouteSequence',edited.join('-'));
+                if(!await saveHelicopterRoute())throw Error(document.getElementById('heliRouteStatus').textContent);
+                if(getHelicopterRoutes()[editKey].codes.join('-')!==edited.join('-')||getHelicopterRoutes()[returnKey].codes.join('-')!==codes.slice().reverse().join('-')||JSON.stringify(getHelicopterRoutes()[otherKey])!==JSON.stringify(originalRoutes[otherKey])||!document.getElementById('cancelHeliRouteEdit').hidden)throw Error('Single-route edit changed unrelated routes or kept edit mode');
+                editHelicopterRoute(editKey);document.getElementById('heliRouteReverse').checked=true;set('heliRouteSequence','HLP-PIMOL-GOLPI-TKG');
+                if(!await saveHelicopterRoute()||getHelicopterRoutes()[returnKey].codes.join('-')!=='TKG-GOLPI-PIMOL-HLP')throw Error('Explicit reverse edit not applied');
+                editHelicopterRoute(editKey);set('heliRouteTo','ZQA');set('heliRouteSequence','HLP-PIMOL-ZQA');
+                if(!await saveHelicopterRoute())throw Error(document.getElementById('heliRouteStatus').textContent);
+                const movedKey=helicopterRouteKey('Bell 412EP','HLP','ZQA');
+                if(getHelicopterRoutes()[editKey]!==null||!getHelicopterRoutes()[movedKey])throw Error('Changed endpoints left the previous active route');
+                editHelicopterRoute(movedKey);set('heliRouteAircraft','AW109S Grand');
+                if(!await saveHelicopterRoute()||getHelicopterRoutes()[movedKey]!==null||!getHelicopterRoutes()[helicopterRouteKey('AW109S Grand','HLP','ZQA')])throw Error('Changed helicopter left the previous active route');
+                const currentKey=helicopterRouteKey('AW109S Grand','HLP','ZQA');editHelicopterRoute(currentKey);
+                const beforeFailure=JSON.stringify(getHelicopterRoutes());
+                window.TWAFirebase.saveConfig=async()=>{throw Error('Simulated save failure')};
+                if(await saveHelicopterRoute()||JSON.stringify(getHelicopterRoutes())!==beforeFailure||document.getElementById('cancelHeliRouteEdit').hidden)throw Error('Failed save discarded edit mode or changed cache');
+            }finally{
+                window.TWAFirebase.saveConfig=saveFunction;
+                await saveFunction('helicopterRoutes',originalRoutes);
+                tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(originalRoutes));
+                cancelHelicopterRouteEdit(false);drawHelicopterRoutesAdmin();
+            }
+            console.log('HELICOPTER_ROUTE_EDIT_CHECKS passed');
             const name='Bell 412EP',plan=selectedRoutePlan(airportMatch('HLP'),airportMatch('TKG'),name);
             if(!plan.ok||plan.points.length!==7||plan.legs.length!==1||plan.legs[0].via.length!==5)throw Error('VFR navigation legs incorrectly create landing sectors');
             const expected=codes.slice(1).reduce((sum,code,i)=>sum+distanceBetween(routePointMatch(codes[i]),routePointMatch(code)),0);
