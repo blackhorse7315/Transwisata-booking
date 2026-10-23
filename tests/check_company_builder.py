@@ -244,26 +244,29 @@ try:
 
         result=page.evaluate("""async()=>{
             const set=(id,value)=>document.getElementById(id).value=value;
-            const fieldIds=['from','to','date','time','pax','plane'];
+            const fieldIds=['from','to','date','time','pax','plane','name','email','phone','company','notes'];
             const values=Object.fromEntries(fieldIds.map(id=>[id,document.getElementById(id).value]));
-            const previous={firebase:window.TWAFirebase,ready:window.TWAHoldsReady,holds:window.TWACloudHolds,owner:holdOwner,held:document.getElementById('plane').dataset.heldPlane||''};
-            let reserves=0,releases=0;
+            const previous={firebase:window.TWAFirebase,ready:window.TWAHoldsReady,holds:window.TWACloudHolds,owner:holdOwner,held:document.getElementById('plane').dataset.heldPlane||'',cache:tenantStorage.getItem('twaBookings'),open:window.open,paymentRef:activePaymentRef};
+            let reserves=0,releases=0;window.waSaved=[];window.waDraftURLs=[];
+            window.open=()=>({closed:false,opener:null,document:{title:'',body:{textContent:''}},location:{replace:url=>waDraftURLs.push(url)},close(){this.closed=true}});
             const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
             const select=async name=>{set('plane',name);document.getElementById('plane').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('plane').dispatchEvent(new Event('change',{bubbles:true}));await tick()};
             window.TWAHoldsReady=true;window.TWACloudHolds={};holdOwner='test-hold-owner';document.getElementById('plane').dataset.heldPlane='';
             window.TWAFirebase={
                 reserveAircraft:async(name)=>{reserves++;const value={plane:name,owner:holdOwner,status:'pending',expires:Date.now()+HOLD_MS};window.TWACloudHolds={...window.TWACloudHolds,[name]:value};return value},
-                releaseAircraft:async(name)=>{releases++;delete window.TWACloudHolds[name]}
+                releaseAircraft:async(name)=>{releases++;delete window.TWACloudHolds[name]},
+                createBooking:async item=>{waSaved.push(JSON.parse(JSON.stringify(item)))}
             };
             try{
                 set('from','HLP');set('to','SUB');set('date',mcTestDate);set('time','09:00');set('pax','4');updateRoute();
                 await select('Gulfstream IV-SP');
                 if(reserves||releases||!lastEstimate||document.getElementById('holdNotice').querySelector('.holdbanner'))throw Error('Preferred Aircraft selection started a hold');
+                set('name','Hold Customer');set('email','hold@example.com');set('phone','+628123456789');set('notes','Vegetarian catering');
                 showPriceDetails(0);
                 if(reserves)throw Error('Opening price details started a hold');
                 document.getElementById('modalBookButton').click();await tick();
                 const held=cleanHolds()['Gulfstream IV-SP'];
-                if(reserves!==1||!held||held.expires-Date.now()>HOLD_MS||held.expires-Date.now()<HOLD_MS-2000||!document.getElementById('holdNotice').querySelector('.holdbanner')||document.getElementById('contact').classList.contains('hidden'))throw Error('Continue Booking did not start a five-minute hold');
+                if(reserves!==1||!held||held.expires-Date.now()>HOLD_MS||held.expires-Date.now()<HOLD_MS-2000||!document.getElementById('holdNotice').querySelector('.holdbanner')||!document.getElementById('contact').classList.contains('hidden')||waSaved.length!==1||waDraftURLs.length!==1)throw Error('Continue Booking did not save the request and start a five-minute hold');
                 await select('King Air 350i');
                 if(reserves!==1||releases!==1||document.getElementById('holdNotice').querySelector('.holdbanner')||!document.getElementById('contact').classList.contains('hidden'))throw Error('Changing quote created or retained an unintended hold');
                 showPriceDetails(1);
@@ -278,17 +281,67 @@ try:
                 showPriceDetails(1);
                 if(reserves!==1)throw Error('Multi City details started a hold');
                 document.getElementById('modalBookButton').click();await tick();
-                if(reserves!==2||!cleanHolds()['King Air 350i']||document.getElementById('contact').classList.contains('hidden'))throw Error('Multi City Continue Booking did not start the hold');
+                if(reserves!==2||!cleanHolds()['King Air 350i']||!document.getElementById('contact').classList.contains('hidden')||waSaved.length!==2||waSaved[1].estimate.routes.length!==2)throw Error('Multi City Continue Booking did not save the request and start the hold');
+                const message=new URL(waDraftURLs[0]).searchParams.get('text');if(!waDraftURLs[0].startsWith('https://wa.me/6281215917554?')||!message.includes('Hold Customer')||!message.includes('Vegetarian catering')||!message.includes('INDICATIVE PRICE BREAKDOWN')||!message.includes('booking='+waSaved[0].ref))throw Error('WhatsApp draft missing booking detail or safe review link');
                 return {quoteSelectionDoesNotReserve:true,priceDetailsDoNotReserve:true,continueStartsFiveMinuteHold:true,changedSelectionReleasesPriorHold:true,incompleteItineraryBlocked:true,multiCity:true};
             }finally{
                 closePriceDetails();
                 trip('One Way',Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='One Way'));
                 for(const [id,value] of Object.entries(values))set(id,value);
                 window.TWAFirebase=previous.firebase;window.TWAHoldsReady=previous.ready;window.TWACloudHolds=previous.holds;holdOwner=previous.owner;
+                window.open=previous.open;activePaymentRef=previous.paymentRef;if(previous.cache===null)tenantStorage.removeItem('twaBookings');else tenantStorage.setItem('twaBookings',previous.cache);
                 document.getElementById('plane').dataset.heldPlane=previous.held;document.getElementById('contact').classList.add('hidden');updateRoute();updateHoldUI();
             }
         }""")
         print("HOLD_ON_CONTINUE_ONLY_CHECKS",json.dumps(result))
+
+        result=page.evaluate("""async()=>{
+            const previous={admin:window.TWAAdminVerified,firebase:window.TWAFirebase,cloud:window.TWACloudBookings,holds:window.TWACloudHolds,cache:tenantStorage.getItem('twaBookings'),phone:tenantStorage.getItem('twaCommunicationV1'),open:window.open,confirm:window.confirm,url:location.href};
+            let saves=0,payments=0,statusWrites=0,replies=[];
+            const item=JSON.parse(JSON.stringify(waSaved[0]));item.ref='TWA-WA-REVIEW';item.createdBy='owner-a';item.estimate.holdOwner='owner-a';item.estimate.holdExpires=Date.now()+HOLD_MS;item.estimate.breakdown=item.estimate.breakdown.map(([label,amountUSD])=>({label,amountUSD}));
+            window.TWAFirebase={
+                saveConfig:async(key,value)=>{if(key!=='communication')throw Error('Wrong settings key');saves++;window.testWhatsAppSettings=value},
+                confirmBookingPayment:async ref=>{if(ref!==item.ref)throw Error('Wrong request confirmed');payments++;window.TWACloudHolds[item.plane]={...window.TWACloudHolds[item.plane],status:'paid'}},
+                setBookingStatus:async(ref,status)=>{statusWrites++}
+            };
+            window.open=url=>{replies.push(url);return null};window.confirm=()=>false;
+            window.TWAAdminVerified=false;document.getElementById('waAdminNumber').value='+628111111111';
+            try{
+                if(await saveWhatsAppSettings()||saves)throw Error('Visitor changed Admin WhatsApp settings');
+                window.TWAAdminVerified=true;
+                document.getElementById('waAdminNumber').value='not-a-number';if(await saveWhatsAppSettings()||saves)throw Error('Invalid WhatsApp number saved');
+                document.getElementById('waAdminNumber').value='+62 811 1111 1111';if(!await saveWhatsAppSettings()||saves!==1||testWhatsAppSettings.adminWhatsApp!=='6281111111111')throw Error('Shared WhatsApp number save failed');
+                if(!bookingWhatsAppURL(item).startsWith('https://wa.me/6281111111111?'))throw Error('Saved WhatsApp number not used');
+                const text=bookingWhatsAppMessage(item);
+                if(!text.includes(item.ref)||!text.includes('Aircraft charter:')||text.includes('[object Object]')||!text.includes('Vegetarian catering'))throw Error('Stored price breakdown not rendered in WhatsApp');
+                window.TWACloudBookings=[item];window.TWACloudHolds={[item.plane]:{owner:'other-owner',expires:item.estimate.holdExpires,status:'paid',plane:item.plane}};
+                tenantStorage.setItem('twaBookings',JSON.stringify([item]));window.TWAAdminVerified=false;
+                if(getData()[0].status==='Confirmed')throw Error('Different owner paid an unrelated request');
+                openBookingReview(item.ref);if(!document.getElementById('waBookingReview').hidden||payments||statusWrites)throw Error('Review link mutated state or showed private data before login');
+                if(await applyBookingAdminAction('payment')||payments)throw Error('Visitor confirmed payment');
+                window.TWAAdminVerified=true;syncAdminView();render();
+                if(!document.getElementById('waConfirmPayment').disabled)throw Error('Wrong hold enabled payment confirmation');
+                window.TWACloudHolds[item.plane]={owner:'owner-a',expires:item.estimate.holdExpires,status:'pending',plane:item.plane};render();
+                if(document.getElementById('waConfirmPayment').disabled)throw Error('Valid linked hold cannot be confirmed');
+                if(await applyBookingAdminAction('payment')||payments)throw Error('Cancelled payment confirmation changed data');
+                window.confirm=()=>true;
+                if(!await applyBookingAdminAction('payment')||payments!==1||TWACloudBookings[0].status!=='Confirmed')throw Error('Admin payment action not linked to request');
+                document.getElementById('waReplyCustomer').click();
+                if(replies.length!==1||!replies[0].startsWith('https://wa.me/628123456789?')||!new URL(replies[0]).searchParams.get('text').includes('Payment receipt has been verified'))throw Error('Admin reply not prepared for the correct customer');
+                window.TWAAdminVerified=false;
+                if(getData()[0].status!=='Confirmed')throw Error('Customer did not see linked payment confirmation');
+                const cached=JSON.parse(tenantStorage.getItem('twaBookings'));if(cached[0].status!=='Confirmed')throw Error('Linked confirmation not cached for customer');
+                if(normalizeWhatsAppNumber('08123456789',true)!=='628123456789')throw Error('Local customer WhatsApp number not normalized');
+                return {editableSharedNumber:true,completeDraft:true,reviewRequiresAdmin:true,noMutationOnLinkOpen:true,linkedConfirmation:true,customerState:true,manualReply:true};
+            }finally{
+                window.TWAAdminVerified=previous.admin;window.TWAFirebase=previous.firebase;window.TWACloudBookings=previous.cloud;window.TWACloudHolds=previous.holds;window.open=previous.open;window.confirm=previous.confirm;
+                if(previous.cache===null)tenantStorage.removeItem('twaBookings');else tenantStorage.setItem('twaBookings',previous.cache);
+                applyCommunicationSettings(previous.phone?JSON.parse(previous.phone):{});history.replaceState(null,'',previous.url);
+                document.getElementById('waCloseReview').click();render();syncAdminView();showPage('booking');
+            }
+        }""")
+        print("WHATSAPP_BOOKING_REVIEW_CHECKS",json.dumps(result))
+
 
         result=page.evaluate("""async()=>{
             const fixed=Date.parse('2026-10-23T03:00:00Z'),realNow=Date.now,fields=['from','to','date','time','returnDate','plane'];

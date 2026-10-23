@@ -129,7 +129,7 @@ body{background:radial-gradient(ellipse at 90% 15%,#cce8ff 0,transparent 34%),li
  }
  #fleet .aircraft .fleet-price-block {padding-inline: clamp(9px,1.15vw,18px) !important;}
 }
-</style><link rel="manifest" href="./manifest.webmanifest?v=20261022-2"><meta name="theme-color" content="#0b1b30"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="TRANSWISATA PRIMA AVIATION"><link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png?v=20261022-3"><link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png?v=20261022-2"><style>.app-brand{display:flex;align-items:center;gap:12px}.app-brand img{width:64px;height:64px;object-fit:contain;background:white;border-radius:12px;padding:4px}#appInstallButton{border:1px solid #d5a95c;border-radius:9px;color:#fff;padding:10px 14px}#appInstallStatus{font-size:12px;color:#d5e5f5;margin:0;max-width:330px}#appInstallStatus:empty{display:none}</style></head><body><header><div class="app-brand"><img id="appBrandLogo" src="./assets/logo.png?v=20261022-2" alt="Logo Transwisata" width="64" height="64"><strong><span id="appCompanyName">TRANSWISATA</span> <small id="appTagline" style="display:block;font-size:10px;letter-spacing:3px;color:#d5a95c">PRIMA AVIATION</small></strong></div><nav><button id="appBookNav" onclick="showPage('booking')">Book Flight</button><button id="appTrackNav" onclick="showPage('track')">Track Booking</button><button id="appAdminNav" onclick="showPage('admin')">Admin</button><button type="button" id="appInstallButton" onclick="installTranswisataApp()">Install App</button><p id="appInstallStatus" role="status" aria-live="polite"></p></nav></header><section class="hero"><div class="container"><span id="appEyebrow" style="color:#d5a95c;letter-spacing:3px">EXCLUSIVE AIR CHARTER</span><h1 id="appHeroTitle">Your Journey. Our Commitment.</h1><p id="appHeroText">Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.</p></div></section><main class="container"><section class="panel" id="booking"><div class="tabs"><button class="active" onclick="trip('One Way',this)">One Way</button><button onclick="trip('Round Trip',this)">Round Trip</button><button onclick="trip('Multi City',this)">Multi City</button></div><div class="grid"><div><label>Departure Airport / Location</label><input id="from" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. HLP or WIHH"></div><div><label>Destination Airport / Location</label><input id="to" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. DPS or WADD"></div><div><label>Departure Date</label><input id="date" type="date"></div><div><label>Departure Time (WIB / UTC+7)</label><input id="time" type="time" value="09:00"></div><div id="returnBox" class="hidden"><label>Return Date</label><input id="returnDate" type="date"></div><div><label>Passengers</label><input id="pax" type="number" min="1" max="100" value="4"></div><div><label>Preferred Aircraft</label><select id="plane"><option value="">Select an aircraft</option><option>Gulfstream IV-SP</option><option>King Air 350i</option><option>CASA 212-200</option><option>Bell 412EP</option><option>AW109S Grand</option></select></div><div><label>Flight Purpose</label><select id="purpose"><option>Private Charter</option><option>Corporate Charter</option><option>Air Taxi</option><option>Medical Evacuation Inquiry</option><option>Other</option></select></div></div><p class="small" id="bookingDatePolicy">Departures are available up to 14 days in advance. Bookings must be made at least 2 hours before ETD. All booking dates and times use WIB (UTC+7).</p><p id="bookingDateError" class="small" role="status" aria-live="polite" style="color:#a32b26"></p><div id="multi" class="hidden" style="margin-top:15px"><label>Additional Stops / Itinerary</label><textarea id="stops" placeholder="Enter additional destinations and dates"></textarea></div><section class="estimate"><h3>Automatic Charter Cost Estimate <span class="pill">Simulation · Not a quotation</span></h3><p class="small">Expanded Asian airport directory: airport distance and aircraft planning speeds calculate flight time automatically. Aircraft hourly prices populate when selected.  Aircraft hourly prices and other charges are illustrative editable inputs, NOT approved Transwisata tariffs. No airport fee database is connected.</p><div class="grid"><div><label>Route Distance (NM, automatically calculated)</label><input id="distance" type="number" min="0" step="1" placeholder="Select departure and destination" readonly></div><div><small id="routeInfo" style="color:#476987">Enter two supported airports across Indonesia and Asia to calculate great-circle distance automatically.</small></div><div><label>Estimated Flight Time (hours / leg · automatic)</label><input id="flightHours" type="number" min="0" step="0.1" placeholder="Calculated automatically" readonly><small id="flightTimeInfo" class="small">Select airports to calculate flight time.</small></div><div><label>Currency</label><select id="currency"><option value="IDR">IDR</option><option value="USD">USD</option></select></div><div><label>USD to IDR (live rate; editable fallback)</label><input id="fx" type="number" min="1" value="16000"><small id="fxStatus" class="small">Checking live USD/IDR exchange rate…</small><button type="button" class="btn secondary" style="padding:7px 12px;margin-top:6px" onclick="refreshFX()">Refresh exchange rate</button></div></div><p class="small">Cost assumptions are managed in the Admin portal. All prices shown are indicative until confirmed by Transwisata Operations.</p><input type="hidden" id="hourly" value="0"><input type="hidden" id="burn" value="0"><input type="hidden" id="fuelPrice" value="5"><input type="hidden" id="handling" value="350"><input type="hidden" id="landing" value="180"><input type="hidden" id="parking" value="100"><input type="hidden" id="parkingDays" value="0"><input type="hidden" id="navFee" value="90"><input type="hidden" id="crew" value="250"><input type="hidden" id="crewDays" value="1"><input type="hidden" id="positioning" value="0"><input type="hidden" id="otherFees" value="0"><input type="hidden" id="service" value="0"><input type="hidden" id="tax" value="0"><div id="costRows" style="margin-top:15px"></div><div class="costrow costtotal"><span>Estimated Total</span><strong id="grandTotal">Enter route distance</strong></div><p id="costNote" class="small" aria-live="polite">Flight estimate pending route distance.</p><div class="actions"><button class="btn secondary" type="button" onclick="printEstimate()">Print Cost Estimate</button></div></section><div class="actions booking-action"><button class="btn" onclick="next()">Continue Booking →</button><span style="color:#65768b;font-size:13px">All requests subject to operational approval and aircraft availability.</span></div><div id="contact" class="hidden" style="margin-top:24px;border-top:1px solid #e5ebf0;padding-top:22px"><h3>Contact & Charter Request</h3><div class="grid"><div><label>Full Name</label><input id="name" placeholder="Contact person"></div><div><label>Email</label><input id="email" type="email" placeholder="name@example.com"></div><div><label>Phone / WhatsApp</label><input id="phone" placeholder="+62..."></div><div><label>Company (Optional)</label><input id="company"></div></div><div style="margin-top:14px"><label>Additional Requirements</label><textarea id="notes" placeholder="Baggage, special assistance, preferred routing..."></textarea></div><div class="actions"><button class="btn" onclick="submitBooking()">Submit Charter Request</button><button class="btn secondary" onclick="document.getElementById('contact').classList.add('hidden')">Back</button></div></div><div id="holdNotice" aria-live="polite"></div><div id="success" class="status"></div></section><section class="section"><h2 id="appFleetTitle">Aircraft & Charter Estimate</h2><p id="appFleetIntro" class="small">Select an aircraft to calculate the estimate for your itinerary.</p><div class="simple-currency"><label>Display currency</label><select id="fleetCurrency" onchange="document.getElementById('currency').value=this.value;calculateEstimate()"><option value="IDR">IDR · Rupiah</option><option value="USD">USD · US Dollar</option></select></div><div class="summary-strip" id="fleetRouteSummary">Enter departure and destination, then select an aircraft to view its estimate.</div><p id="appFleetNote" style="color:#65768b">Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.</p><div class="fleet" id="fleet"></div><p class="small">Aircraft reservation holds expire after 5 minutes.</p></section><div id="priceModal" class="modal-backdrop hidden" onclick="if(event.target===this)closePriceDetails()"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="priceModalTitle"><div class="modal-head"><h2 id="priceModalTitle">Aircraft price details</h2><button type="button" onclick="closePriceDetails()" aria-label="Close">✕</button></div><div id="priceModalContent"></div><div class="actions"><button class="btn" id="modalBookButton" type="button">Select & Continue Booking →</button><button class="btn secondary" type="button" onclick="closePriceDetails()">Close</button></div></div></div><section id="paymentPage" class="panel hidden" style="margin-top:20px"><h2>Secure Payment Options</h2><p class="small">Payment method selection · Demo only. No real payment is initiated or collected.</p><div class="holdbanner" id="paymentTimer"></div><div id="paymentSummary"></div><h3>Select Payment Method</h3><label class="payment-option"><input type="radio" name="payMethod" value="QRIS" onchange="renderPaymentMethod()"> <span><strong>QRIS</strong><br><small>Pay using a verified merchant QRIS from Transwisata's authorized payment provider</small></span></label><label class="payment-option"><input type="radio" name="payMethod" value="Bank Transfer" onchange="renderPaymentMethod()"> <span><strong>Bank Transfer</strong><br><small>Official company bank account or payment virtual account</small></span></label><label class="payment-option"><input type="radio" name="payMethod" value="Credit Card" onchange="renderPaymentMethod()"> <span><strong>Credit / Debit Card</strong><br><small>Redirect to a secure hosted payment gateway when configured</small></span></label><div id="paymentInstructions" class="pay-info">Choose a payment method to view instructions.</div><div class="actions"><button class="btn secondary" onclick="showPage('booking')">← Back to Booking</button><button class="btn" onclick="requestPaymentInstructions()">Request Official Payment Instructions</button></div><div id="paymentMessage" class="status"></div></section><section id="track" class="panel hidden" style="margin-top:20px"><h2>Track Your Charter Request</h2><p>Enter the booking reference received after submitting your inquiry.</p><div class="actions"><input id="reference" placeholder="TWA-..." style="max-width:320px"><button class="btn" onclick="track()">Track</button></div><div id="tracking" class="status"></div></section><section id="admin" class="panel hidden" style="margin-top:20px">
+</style><link rel="manifest" href="./manifest.webmanifest?v=20261022-2"><meta name="theme-color" content="#0b1b30"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="TRANSWISATA PRIMA AVIATION"><link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png?v=20261022-3"><link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png?v=20261022-2"><style>.app-brand{display:flex;align-items:center;gap:12px}.app-brand img{width:64px;height:64px;object-fit:contain;background:white;border-radius:12px;padding:4px}#appInstallButton{border:1px solid #d5a95c;border-radius:9px;color:#fff;padding:10px 14px}#appInstallStatus{font-size:12px;color:#d5e5f5;margin:0;max-width:330px}#appInstallStatus:empty{display:none}</style></head><body><header><div class="app-brand"><img id="appBrandLogo" src="./assets/logo.png?v=20261022-2" alt="Logo Transwisata" width="64" height="64"><strong><span id="appCompanyName">TRANSWISATA</span> <small id="appTagline" style="display:block;font-size:10px;letter-spacing:3px;color:#d5a95c">PRIMA AVIATION</small></strong></div><nav><button id="appBookNav" onclick="showPage('booking')">Book Flight</button><button id="appTrackNav" onclick="showPage('track')">Track Booking</button><button id="appAdminNav" onclick="showPage('admin')">Admin</button><button type="button" id="appInstallButton" onclick="installTranswisataApp()">Install App</button><p id="appInstallStatus" role="status" aria-live="polite"></p></nav></header><section class="hero"><div class="container"><span id="appEyebrow" style="color:#d5a95c;letter-spacing:3px">EXCLUSIVE AIR CHARTER</span><h1 id="appHeroTitle">Your Journey. Our Commitment.</h1><p id="appHeroText">Explore private aviation with Transwisata Prima Aviation. Request a tailored charter flight in minutes.</p></div></section><main class="container"><section class="panel" id="booking"><div class="tabs"><button class="active" onclick="trip('One Way',this)">One Way</button><button onclick="trip('Round Trip',this)">Round Trip</button><button onclick="trip('Multi City',this)">Multi City</button></div><div class="grid"><div><label>Departure Airport / Location</label><input id="from" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. HLP or WIHH"></div><div><label>Destination Airport / Location</label><input id="to" autocomplete="off" aria-autocomplete="list" placeholder="City / IATA / ICAO, e.g. DPS or WADD"></div><div><label>Departure Date</label><input id="date" type="date"></div><div><label>Departure Time (WIB / UTC+7)</label><input id="time" type="time" value="09:00"></div><div id="returnBox" class="hidden"><label>Return Date</label><input id="returnDate" type="date"></div><div><label>Passengers</label><input id="pax" type="number" min="1" max="100" value="4"></div><div><label>Preferred Aircraft</label><select id="plane"><option value="">Select an aircraft</option><option>Gulfstream IV-SP</option><option>King Air 350i</option><option>CASA 212-200</option><option>Bell 412EP</option><option>AW109S Grand</option></select></div><div><label>Flight Purpose</label><select id="purpose"><option>Private Charter</option><option>Corporate Charter</option><option>Air Taxi</option><option>Medical Evacuation Inquiry</option><option>Other</option></select></div></div><p class="small" id="bookingDatePolicy">Departures are available up to 14 days in advance. Bookings must be made at least 2 hours before ETD. All booking dates and times use WIB (UTC+7).</p><p id="bookingDateError" class="small" role="status" aria-live="polite" style="color:#a32b26"></p><div id="multi" class="hidden" style="margin-top:15px"><label>Additional Stops / Itinerary</label><textarea id="stops" placeholder="Enter additional destinations and dates"></textarea></div><section class="estimate"><h3>Automatic Charter Cost Estimate <span class="pill">Simulation · Not a quotation</span></h3><p class="small">Expanded Asian airport directory: airport distance and aircraft planning speeds calculate flight time automatically. Aircraft hourly prices populate when selected.  Aircraft hourly prices and other charges are illustrative editable inputs, NOT approved Transwisata tariffs. No airport fee database is connected.</p><div class="grid"><div><label>Route Distance (NM, automatically calculated)</label><input id="distance" type="number" min="0" step="1" placeholder="Select departure and destination" readonly></div><div><small id="routeInfo" style="color:#476987">Enter two supported airports across Indonesia and Asia to calculate great-circle distance automatically.</small></div><div><label>Estimated Flight Time (hours / leg · automatic)</label><input id="flightHours" type="number" min="0" step="0.1" placeholder="Calculated automatically" readonly><small id="flightTimeInfo" class="small">Select airports to calculate flight time.</small></div><div><label>Currency</label><select id="currency"><option value="IDR">IDR</option><option value="USD">USD</option></select></div><div><label>USD to IDR (live rate; editable fallback)</label><input id="fx" type="number" min="1" value="16000"><small id="fxStatus" class="small">Checking live USD/IDR exchange rate…</small><button type="button" class="btn secondary" style="padding:7px 12px;margin-top:6px" onclick="refreshFX()">Refresh exchange rate</button></div></div><p class="small">Cost assumptions are managed in the Admin portal. All prices shown are indicative until confirmed by Transwisata Operations.</p><input type="hidden" id="hourly" value="0"><input type="hidden" id="burn" value="0"><input type="hidden" id="fuelPrice" value="5"><input type="hidden" id="handling" value="350"><input type="hidden" id="landing" value="180"><input type="hidden" id="parking" value="100"><input type="hidden" id="parkingDays" value="0"><input type="hidden" id="navFee" value="90"><input type="hidden" id="crew" value="250"><input type="hidden" id="crewDays" value="1"><input type="hidden" id="positioning" value="0"><input type="hidden" id="otherFees" value="0"><input type="hidden" id="service" value="0"><input type="hidden" id="tax" value="0"><div id="costRows" style="margin-top:15px"></div><div class="costrow costtotal"><span>Estimated Total</span><strong id="grandTotal">Enter route distance</strong></div><p id="costNote" class="small" aria-live="polite">Flight estimate pending route distance.</p><div class="actions"><button class="btn secondary" type="button" onclick="printEstimate()">Print Cost Estimate</button></div></section><div class="actions booking-action"><button class="btn" onclick="next()">Continue Booking →</button><span style="color:#65768b;font-size:13px">All requests subject to operational approval and aircraft availability.</span></div><div id="contact" class="hidden" style="margin-top:24px;border-top:1px solid #e5ebf0;padding-top:22px"><h3>Contact & Charter Request</h3><div class="grid"><div><label>Full Name</label><input id="name" placeholder="Contact person"></div><div><label>Email</label><input id="email" type="email" placeholder="name@example.com"></div><div><label>Phone / WhatsApp</label><input id="phone" placeholder="+62..."></div><div><label>Company (Optional)</label><input id="company"></div></div><div style="margin-top:14px"><label>Additional Requirements</label><textarea id="notes" placeholder="Baggage, special assistance, preferred routing..."></textarea></div><div class="actions"><button class="btn" onclick="submitBooking()">Submit Charter Request</button><button class="btn secondary" onclick="document.getElementById('contact').classList.add('hidden')">Back</button></div></div><div id="holdNotice" aria-live="polite"></div><div id="success" class="status"></div></section><section class="section"><h2 id="appFleetTitle">Aircraft & Charter Estimate</h2><p id="appFleetIntro" class="small">Select an aircraft to calculate the estimate for your itinerary.</p><div class="simple-currency"><label>Display currency</label><select id="fleetCurrency" onchange="document.getElementById('currency').value=this.value;calculateEstimate()"><option value="IDR">IDR · Rupiah</option><option value="USD">USD · US Dollar</option></select></div><div class="summary-strip" id="fleetRouteSummary">Enter departure and destination, then select an aircraft to view its estimate.</div><p id="appFleetNote" style="color:#65768b">Aircraft assignments depend on route, passenger load, performance, maintenance status and regulatory approvals.</p><div class="fleet" id="fleet"></div><p class="small">Aircraft reservation holds expire after 5 minutes.</p></section><div id="priceModal" class="modal-backdrop hidden" onclick="if(event.target===this)closePriceDetails()"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="priceModalTitle"><div class="modal-head"><h2 id="priceModalTitle">Aircraft price details</h2><button type="button" onclick="closePriceDetails()" aria-label="Close">✕</button></div><div id="priceModalContent"></div><div class="actions"><button class="btn" id="modalBookButton" type="button">Select & Continue Booking →</button><button class="btn secondary" type="button" onclick="closePriceDetails()">Close</button></div></div></div><section id="paymentPage" class="panel hidden" style="margin-top:20px"><h2>Booking & Payment Instructions</h2><p class="small">Request official payment instructions from Admin. Payment receipt is verified by Admin before the aircraft reservation is confirmed.</p><div class="holdbanner" id="paymentTimer"></div><div id="paymentSummary"></div><h3>Select Payment Method</h3><label class="payment-option"><input type="radio" name="payMethod" value="QRIS" onchange="renderPaymentMethod()"> <span><strong>QRIS</strong><br><small>Pay using a verified merchant QRIS from Transwisata's authorized payment provider</small></span></label><label class="payment-option"><input type="radio" name="payMethod" value="Bank Transfer" onchange="renderPaymentMethod()"> <span><strong>Bank Transfer</strong><br><small>Official company bank account or payment virtual account</small></span></label><label class="payment-option"><input type="radio" name="payMethod" value="Credit Card" onchange="renderPaymentMethod()"> <span><strong>Credit / Debit Card</strong><br><small>Redirect to a secure hosted payment gateway when configured</small></span></label><div id="paymentInstructions" class="pay-info">Choose a payment method to view instructions.</div><div class="actions"><button class="btn secondary" onclick="showPage('booking')">← Back to Booking</button><button class="btn" onclick="requestPaymentInstructions()">Request Official Payment Instructions</button></div><div id="paymentMessage" class="status"></div></section><section id="track" class="panel hidden" style="margin-top:20px"><h2>Track Your Charter Request</h2><p>Enter the booking reference received after submitting your inquiry.</p><div class="actions"><input id="reference" placeholder="TWA-..." style="max-width:320px"><button class="btn" onclick="track()">Track</button></div><div id="tracking" class="status"></div></section><section id="admin" class="panel hidden" style="margin-top:20px">
 <div id="adminGate"><h2>Administrator Login</h2><p>Authorized Transwisata staff only.</p><div class="grid"><div><label>Username</label><input id="adminUser" autocomplete="username" placeholder="Firebase Admin Email" type="email"></div><div><label>Password</label><input id="adminPass" type="password" autocomplete="current-password" placeholder="Password" onkeydown="if(event.key==='Enter')adminSignIn()"></div></div><div class="actions"><button class="btn" onclick="adminSignIn()">Sign In</button></div><p id="adminError" class="small" style="color:#b42318"></p></div>
 <div id="adminWorkspace" class="hidden"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px"><h2>Advanced Cost Management</h2><button class="btn secondary" onclick="adminSignOut()">Sign Out</button></div><p class="small">Manage aircraft rates, default charges, and airport ground handling in IDR or USD. All values are normalized to USD for calculation and synchronized with Firebase Firestore when authorized. Local cache is retained.<div style="max-width:320px;margin-top:15px"><label>Admin Pricing Currency</label><select id="adminCurrency" onchange="changeAdminCurrency(this.value)"><option value="USD">USD — US Dollar</option><option value="IDR">IDR — Indonesian Rupiah</option></select><small class="small">Currency selection updates monetary labels and values. Fuel burn is entered in liters per flight hour and fuel price per liter in both USD and IDR modes. Unsaved edits will be preserved when switching.</small></div></p>
 <h3>Fleet Performance & Specifications</h3><p class="small">Edit cruise speed, endurance, passenger seats and maximum range for each aircraft. These values appear in the Fleet comparison cards. Display information only; operational limits must be verified against approved aircraft documents.</p><div id="fleetSpecsAdmin" class="fleet-spec-admin"></div><div class="actions"><button class="btn" type="button" onclick="saveFleetSpecs()">Save Fleet Specifications</button><button class="btn secondary" type="button" onclick="resetFleetSpecs()">Reset Specifications</button></div><p id="fleetSpecsSaved" class="small" aria-live="polite"></p><h3>Fleet Background Photos</h3><p class="small">Upload a separate background photo for each aircraft. Images are optimized and saved to the shared Firebase Firestore database after authorized Admin login. Successfully saved photos update automatically for website visitors on other devices.</p><div class="actions"><button class="btn secondary" type="button" onclick="syncLocalFleetPhotos()">Sync Photos from This Device</button></div><p class="small">If photos appear only on this device, use this button while signed in as Admin. Wait for the Firebase success message before checking another device.</p><div id="fleetPhotoAdmin" class="fleet-photo-admin"></div><p id="fleetPhotoStatus" class="small" aria-live="polite"></p><h3>Aircraft Pricing</h3><div id="adminAircraftRates" class="costgrid"></div>
@@ -1257,13 +1257,21 @@ async function releaseMyHold(){
 function updateHoldUI(){const h=cleanHolds();document.querySelectorAll('#fleet .aircraft').forEach((card,i)=>{const planeName=aircraft[i][0],v=h[planeName],btn=card.querySelector('button');let badge=card.querySelector('.fleet-state');if(!badge){badge=document.createElement('span');badge.className='fleet-state';card.prepend(badge)}if(badge.parentElement!==card)card.prepend(badge);badge.className='fleet-state '+(!v?'free':v.status==='paid'?'paid':'held');badge.textContent=(!window.TWAHoldsReady||!navigator.onLine)?'Availability unavailable':!v?'Available':v.status==='paid'?'Not Available · Payment confirmed':v.owner===holdOwner?'Not Available · Booking in Progress · '+formatRemaining(v.expires-Date.now()):'Not Available · Booking in Progress';if(btn){btn.disabled=false;btn.textContent='View Price Details ↗';btn.onclick=()=>showPriceDetails(i)}});
 const selected=document.getElementById('plane').value,v=h[selected],notice=document.getElementById('holdNotice');if(!window.TWAHoldsReady||!navigator.onLine){notice.textContent='Live aircraft availability unavailable. '+(window.TWAHoldsError||'Connecting to Firebase…')}else if(v&&v.owner===holdOwner&&v.status==='pending'){notice.innerHTML='<div class="holdbanner"><b>Aircraft temporarily held · '+formatRemaining(v.expires-Date.now())+' remaining</b><p class="small">Complete payment through an authorized Transwisata payment channel. This reservation is shared with all online devices. No payment gateway is connected. The hold expires automatically after 5 minutes unless payment is confirmed by an administrator.</p><button class="btn secondary" type="button" onclick="releaseMyHold()">Release Hold</button></div>'}else{notice.innerHTML=''}
 renderHoldAdmin(h)}
-function renderHoldAdmin(h){const root=document.getElementById('adminHolds');if(!root)return;root.innerHTML=Object.entries(h).map(([p,v])=>'<div class="costrow"><span>'+esc(p)+' — '+(v.status==='paid'?'Payment confirmed':'Pending · '+formatRemaining(v.expires-Date.now()))+'</span><span>'+(v.status==='pending'?'<button class="btn secondary" onclick="confirmHoldPayment(\''+p+'\')">Confirm Payment (Admin)</button> ':'')+'<button class="btn secondary" onclick="adminReleaseHold(\''+p+'\')">Release</button></span></div>').join('')||'<p class="small">No active holds.</p>'}
+function renderHoldAdmin(h){const root=document.getElementById('adminHolds');if(!root)return;root.innerHTML=Object.entries(h).map(([p,v])=>'<div class="costrow"><span>'+esc(p)+' — '+(v.status==='paid'?'Payment confirmed':'Pending · '+formatRemaining(v.expires-Date.now()))+'</span><span>'+(v.status==='pending'?'<button class="btn secondary" onclick="confirmHoldPayment(\''+p+'\')">Review / Confirm Payment</button> ':'')+'<button class="btn secondary" onclick="adminReleaseHold(\''+p+'\')">Release</button></span></div>').join('')||'<p class="small">No active holds.</p>'}
 async function confirmHoldPayment(p){if(!window.TWAAdminVerified)return;if(!confirm('Confirm only after independently verifying payment was received. Continue?'))return;try{await window.TWAFirebase.confirmAircraftPayment(p);updateHoldUI()}catch(e){alert('Payment confirmation failed: '+e.message)}}
 async function adminReleaseHold(p){if(!window.TWAAdminVerified)return;try{await window.TWAFirebase.releaseAircraft(p);updateHoldUI()}catch(e){alert('Release failed: '+e.message)}}
 let activePaymentRef=null;
 function openPayment(ref){activePaymentRef=ref;showPage('paymentPage');renderPaymentSummary();renderPaymentMethod();updatePaymentTimer()}
-function renderPaymentSummary(){const b=getData().find(x=>x.ref===activePaymentRef);const el=document.getElementById('paymentSummary');if(!b){el.textContent='Booking not found in this browser.';return}const currency=b.estimate?.currency||document.getElementById('currency').value;const amount=b.estimate?.total ?? b.estimate?.grandTotal;el.innerHTML='<div class="costrow"><span>Booking Reference</span><strong>'+esc(b.ref)+'</strong></div><div class="costrow"><span>Aircraft</span><strong>'+esc(b.plane)+'</strong></div><div class="costrow"><span>Route</span><strong>'+esc(b.from)+' → '+esc(b.to)+'</strong></div><p class="small">Indicative estimate only; the final payable amount must be confirmed by Transwisata.</p><div class="pay-total">'+(Number.isFinite(Number(amount))?esc(currency)+' '+Number(amount).toLocaleString('en-US',{maximumFractionDigits:2}):'Amount pending official quotation')+'</div>'}
-function updatePaymentTimer(){const el=document.getElementById('paymentTimer');if(!el||!activePaymentRef)return;const b=getData().find(x=>x.ref===activePaymentRef);const h=cleanHolds(),v=b&&h[b.plane];if(!v||v.owner!==holdOwner||v.status!=='pending'){el.textContent=v?.status==='paid'?'Payment verified by admin.':'Reservation hold expired or unavailable. Return to booking to make a new request.';return}el.innerHTML='<strong>Payment reservation hold: '+formatRemaining(v.expires-Date.now())+'</strong><p class="small">This hold expires automatically after 5 minutes. Selecting a payment method does not confirm payment.</p>'}
+function renderPaymentSummary(){const b=getData().find(x=>x.ref===activePaymentRef);const el=document.getElementById('paymentSummary');if(!b){el.textContent='Booking not found in this browser.';return}const currency=b.estimate?.currency||document.getElementById('currency').value;const amount=b.estimate?.total ?? b.estimate?.grandTotal ?? (Number.isFinite(b.estimate?.totalUSD)?b.estimate.totalUSD*(currency==='IDR'?(Number(b.estimate.fx)||num('fx')):1):undefined);el.innerHTML='<div class="costrow"><span>Booking Reference</span><strong>'+esc(b.ref)+'</strong></div><div class="costrow"><span>Aircraft</span><strong>'+esc(b.plane)+'</strong></div><div class="costrow"><span>Route</span><strong>'+esc(b.from)+' → '+esc(b.to)+'</strong></div><p class="small">Indicative estimate only; the final payable amount must be confirmed by Transwisata.</p><div class="pay-total">'+(Number.isFinite(Number(amount))?esc(currency)+' '+Number(amount).toLocaleString('en-US',{maximumFractionDigits:2}):'Amount pending official quotation')+'</div>'}
+function updatePaymentTimer(){
+ const el=document.getElementById('paymentTimer');if(!el||!activePaymentRef)return;
+ const b=getData().find(x=>x.ref===activePaymentRef),v=b&&window.TWACloudHolds?.[b.plane],estimate=b?.estimate;
+ const matched=v&&estimate&&v.owner===(b.createdBy||estimate.holdOwner)&&Number(v.expires)===estimate.holdExpires;
+ if(!matched){el.textContent='Reservation hold expired, changed or unavailable. Please return to booking to create a new request.';return}
+ if(v.status==='paid'){el.textContent='Payment receipt verified by Admin. Your aircraft reservation is confirmed.';return}
+ if(v.status!=='pending'||v.expires<=Date.now()){el.textContent=v.status==='released'?'This reservation hold has been released.':'Reservation hold expired. Return to booking to make a new request.';return}
+ el.innerHTML='<strong>Aircraft reservation hold: '+formatRemaining(v.expires-Date.now())+'</strong><p class="small">Press Send in WhatsApp to notify Admin. This hold expires after 5 minutes. Payment must be independently verified by Admin.</p>';
+}
 function renderPaymentMethod(){const method=document.querySelector('input[name="payMethod"]:checked')?.value;const content={QRIS:'An official dynamic QRIS code will appear here after a licensed payment gateway is connected. Do not transfer funds using an unverified QR code.', 'Bank Transfer':'Official beneficiary name, bank and virtual account will appear here after Transwisata provides verified bank/payment details. No account numbers have been configured.', 'Credit Card':'A secure hosted checkout link will appear here after a PCI-compliant payment gateway is connected. Card numbers must never be entered into this demo page.'};document.getElementById('paymentInstructions').textContent=content[method]||'Choose a payment method to view instructions.'}
 function requestPaymentInstructions(){const method=document.querySelector('input[name="payMethod"]:checked')?.value;if(!method){alert('Please select QRIS, Bank Transfer, or Credit Card.');return}const b=getData().find(x=>x.ref===activePaymentRef),v=b&&cleanHolds()[b.plane];if(!v||v.owner!==holdOwner||v.status!=='pending'){alert('Your 5-minute booking hold has expired. Please select an available aircraft again.');return}const all=getData(),idx=all.findIndex(x=>x.ref===activePaymentRef);if(idx>=0){all[idx].paymentMethod=method;all[idx].paymentStatus='Awaiting official payment instructions';tenantStorage.setItem('twaBookings',JSON.stringify(all))}const box=document.getElementById('paymentMessage');box.style.display='block';box.textContent=method+' selected for '+activePaymentRef+'. No payment has been made or sent. Please contact Transwisata through its verified official channel to obtain payment instructions and final quotation.'}
 setInterval(updatePaymentTimer,1000);
@@ -1285,7 +1293,232 @@ window.addEventListener('online',updateHoldUI);window.addEventListener('offline'
 window.addEventListener('storage',updateHoldUI);
 setInterval(updateHoldUI,1000);
 updateHoldUI();
-</script><script src="./multicity.js"></script><script src="./runway-data.js"></script><script src="./runways.js"></script><script src="./navigation.js"></script><script src="./customization.js"></script><script type="module" id="twaFirebaseModule">
+</script><script src="./multicity.js"></script><script src="./runway-data.js"></script><script src="./runways.js"></script><script src="./navigation.js"></script><script src="./customization.js"></script><script id="bookingCommunication">
+/* WhatsApp click-to-chat drafts and authenticated booking review. No messages are sent automatically. */
+(function(){
+'use strict';
+const el=id=>document.getElementById(id),baseChoose=window.choose,baseDetails=window.showPriceDetails,baseRender=window.render,baseSync=window.syncAdminView,baseGetData=window.getData,basePayment=window.renderPaymentSummary;
+let communication={adminWhatsApp:'6281215917554'},busy=false,reviewRef='',actionBusy=false,lastShared=null;
+function normalizeNumber(value,local=false){
+ let text=String(value||'').trim();if(!/^\+?[\d\s().-]+$/.test(text))throw Error('Use an international WhatsApp number, for example +6281215917554.');
+ let digits=text.replace(/\D/g,'');if(local&&digits.startsWith('00'))digits=digits.slice(2);else if(local&&digits.startsWith('0'))digits='62'+digits.slice(1);
+ if(!/^[1-9]\d{7,14}$/.test(digits))throw Error('Use an international WhatsApp number with 8–15 digits.');
+ return digits;
+}
+window.normalizeWhatsAppNumber=normalizeNumber;
+const settings=document.createElement('section');settings.id='whatsAppAdminSettings';
+settings.innerHTML='<h3>WhatsApp Admin Contact</h3><p class="small">Customer booking messages open as WhatsApp drafts. The sender must press Send. Booking confirmations are completed in this application after Admin sign-in.</p><div style="max-width:420px"><label for="waAdminNumber">Admin WhatsApp number · international format</label><input id="waAdminNumber" type="tel" maxlength="30" value="+6281215917554" placeholder="+6281215917554"></div><div class="actions"><button class="btn" id="waSaveNumber" type="button">Save WhatsApp Number</button></div><p id="waSettingsStatus" class="small" role="status" aria-live="polite"></p>';
+el('adminWorkspace').append(settings);
+const review=document.createElement('section');review.id='waBookingReview';review.hidden=true;
+review.innerHTML='<h3 id="waReviewHeading">Booking Review</h3><div id="waReviewBody" style="white-space:pre-wrap;padding:18px;border:1px solid #d5e2ed;border-radius:12px;background:#f7fbff;overflow-wrap:anywhere"></div><p id="waReviewHold" class="small"></p><div class="actions"><button class="btn" type="button" id="waConfirmPayment">Confirm Payment</button><button class="btn secondary" type="button" id="waUnderReview">Mark Under Review</button><button class="btn secondary" type="button" id="waCancelRequest">Cancel Request</button><button class="btn secondary" type="button" id="waReplyCustomer">Reply via WhatsApp</button><button class="btn secondary" type="button" id="waCloseReview">Close Review</button></div><p id="waReviewStatus" class="small" role="status" aria-live="polite"></p>';
+el('adminWorkspace').prepend(review);
+const loginNote=document.createElement('p');loginNote.id='waReviewLoginNote';loginNote.className='small';el('adminGate').append(loginNote);
+window.applyCommunicationSettings=function(value){
+ try{communication={adminWhatsApp:normalizeNumber(value?.adminWhatsApp||'6281215917554')};try{tenantStorage.setItem('twaCommunicationV1',JSON.stringify(communication))}catch{}
+  if(document.activeElement!==el('waAdminNumber'))el('waAdminNumber').value='+'+communication.adminWhatsApp;
+  if(lastShared)showShare(lastShared);
+ }catch(error){console.warn('WhatsApp settings:',error.message)}
+};
+window.saveWhatsAppSettings=async function(){
+ const status=el('waSettingsStatus'),button=el('waSaveNumber');
+ try{
+  if(!window.TWAAdminVerified||!window.TWAFirebase?.saveConfig)throw Error('Admin sign-in is required.');
+  if(!navigator.onLine)throw Error('Reconnect to save the shared WhatsApp number.');
+  const value={adminWhatsApp:normalizeNumber(el('waAdminNumber').value)};button.disabled=true;status.textContent='Saving WhatsApp number…';
+  await window.TWAFirebase.saveConfig('communication',value);applyCommunicationSettings(value);el('waAdminNumber').value='+'+communication.adminWhatsApp;status.textContent='WhatsApp number saved and synchronized across devices.';return true;
+ }catch(error){status.textContent='Save failed: '+(error.code||error.message);return false}
+ finally{button.disabled=false}
+};
+el('waSaveNumber').onclick=()=>saveWhatsAppSettings();
+try{applyCommunicationSettings(JSON.parse(tenantStorage.getItem('twaCommunicationV1')||'{}'))}catch{applyCommunicationSettings({})}
+function appURL(reference){
+ const url=new URL(location.href);url.search='';url.hash='admin';url.searchParams.set('booking',reference);return url.href;
+}
+function quoteMoney(value,estimate){
+ const currency=estimate?.currency==='IDR'&&Number(estimate?.fx)>0?'IDR':'USD',rate=currency==='IDR'?Number(estimate?.fx)||1:1;
+ return new Intl.NumberFormat(currency==='IDR'?'id-ID':'en-US',{style:'currency',currency,maximumFractionDigits:currency==='IDR'?0:2}).format(Number(value)*rate);
+}
+function linkedHold(booking){
+ const hold=window.TWACloudHolds?.[booking?.plane],quote=booking?.estimate;
+ return hold&&quote&&typeof quote.holdExpires==='number'&&hold.owner===(booking.createdBy||quote.holdOwner)&&Number(hold.expires)===quote.holdExpires?hold:null;
+}
+window.bookingWhatsAppMessage=function(booking,includeLink=true){
+ const estimate=booking.estimate,lines=[window.getCurrentCompanyConfig?.().appName||'TRANSWISATA PRIMA AVIATION','CHARTER BOOKING REQUEST','Reference: '+booking.ref,'','Customer: '+booking.name,'Email: '+booking.email,'WhatsApp: '+booking.phone];
+ if(booking.company)lines.push('Company: '+booking.company);
+ lines.push('','Aircraft: '+booking.plane,'Trip: '+booking.trip,'Passengers: '+booking.pax,'Purpose: '+booking.purpose,'','FLIGHT ITINERARY (WIB / UTC+7)');
+ const routes=estimate?.routes?.length?estimate.routes:requestFlights(booking);
+ routes.forEach((flight,index)=>lines.push((index+1)+'. '+(flight.route||requestAirport(flight.from)+' -> '+requestAirport(flight.to))+' | '+requestDate(flight.date)+(flight.time?' '+flight.time+' WIB':' | Time to be confirmed')+(Number.isFinite(flight.hours)?' | '+timeLabel(flight.hours):'')));
+ if(estimate?.breakdown?.length){lines.push('','INDICATIVE PRICE BREAKDOWN');for(const entry of estimate.breakdown){const [label,amount]=Array.isArray(entry)?entry:[entry.label,entry.amountUSD];lines.push(label+': '+quoteMoney(amount,estimate))}}
+ if(requestEstimateUSD(booking)!==null)lines.push('ESTIMATED TOTAL: '+quoteMoney(requestEstimateUSD(booking),estimate),'USD equivalent: '+Number(requestEstimateUSD(booking)).toLocaleString('en-US',{style:'currency',currency:'USD'}));
+ else lines.push('Price: awaiting quotation');
+ lines.push('Indicative estimate; subject to Operations confirmation.','','Additional requirements: '+(booking.notes||'None provided'));
+ if(booking.paymentMethod)lines.push('Payment method requested: '+booking.paymentMethod);
+ if(estimate?.holdExpires)lines.push('','Hold expires: '+requestTimestamp(new Date(estimate.holdExpires))+' WIB','The aircraft hold expires after 5 minutes unless payment is verified by Admin.');
+ if(includeLink)lines.push('','ADMIN REVIEW / PAYMENT CONFIRMATION',appURL(booking.ref),'Open the booking link and sign in as Admin to confirm payment, review or cancel this request.');
+ return lines.join('\n');
+};
+window.bookingWhatsAppURL=function(booking){return 'https://wa.me/'+communication.adminWhatsApp+'?text='+encodeURIComponent(bookingWhatsAppMessage(booking))};
+const share=document.createElement('section');share.id='waBookingShare';share.hidden=true;
+share.innerHTML='<h3>Send Your Booking to Admin</h3><p class="small">Your booking is saved. Open WhatsApp and press Send to notify Admin. This application cannot verify whether a WhatsApp message was sent.</p><div class="actions"><a class="btn" id="waOpenDraft" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Open WhatsApp</a><button class="btn secondary" type="button" id="waCopyDraft">Copy Message</button></div><details style="margin-top:14px"><summary>Preview WhatsApp message</summary><pre id="waDraftPreview" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:12px"></pre></details><p class="small" id="waShareStatus" role="status"></p>';
+el('paymentPage').append(share);
+function showShare(booking){lastShared=booking;share.hidden=false;el('waOpenDraft').href=bookingWhatsAppURL(booking);el('waDraftPreview').textContent=bookingWhatsAppMessage(booking)}
+el('waCopyDraft').onclick=async()=>{try{await navigator.clipboard.writeText(el('waDraftPreview').textContent);el('waShareStatus').textContent='Message copied. Paste it into WhatsApp and press Send.'}catch{el('waShareStatus').textContent='Copy is unavailable. Select the text in the message preview to copy it.'}};
+function popupDraft(){try{const popup=window.open('about:blank','_blank');if(popup){popup.opener=null;popup.document.title='Preparing WhatsApp';popup.document.body.textContent='Saving your booking. Your WhatsApp draft will open here.'}return popup}catch{return null}}
+function closePopup(popup){try{popup?.close()}catch{}}
+function navigatePopup(popup,url){try{if(popup&&!popup.closed){popup.location.replace(url);return true}}catch{}return false}
+function contactForm(){
+ el('waCustomerForm')?.remove();
+ const form=document.createElement('form');form.id='waCustomerForm';form.noValidate=true;
+ form.innerHTML='<h3>Contact & Charter Request</h3><p class="small">Complete your contact details before starting the 5-minute hold. WhatsApp opens with your booking details; press Send to notify Admin.</p><div class="grid"><div><label for="waName">Full Name</label><input id="waName" autocomplete="name" required maxlength="200"></div><div><label for="waEmail">Email</label><input id="waEmail" type="email" autocomplete="email" required maxlength="254"></div><div><label for="waPhone">Phone / WhatsApp</label><input id="waPhone" type="tel" autocomplete="tel" required maxlength="50" placeholder="+62..."></div><div><label for="waCompany">Company (Optional)</label><input id="waCompany" maxlength="200"></div></div><div style="margin-top:14px"><label for="waNotes">Additional Requirements</label><textarea id="waNotes" maxlength="3000" placeholder="Baggage, catering, assistance, preferred routing..."></textarea></div><p id="waCustomerError" class="small" role="status" aria-live="polite" style="color:#a32b26"></p>';
+ for(const [target,source] of [['waName','name'],['waEmail','email'],['waPhone','phone'],['waCompany','company'],['waNotes','notes']]){
+  const input=form.querySelector('#'+target);input.value=el(source).value;input.addEventListener('input',()=>{el(source).value=input.value});
+ }
+ form.onsubmit=event=>{event.preventDefault();el('modalBookButton').click()};
+ el('priceModalContent').append(form);
+}
+window.showPriceDetails=function(index){
+ if(!aircraft[index]||el('plane').value!==aircraft[index][0])return;
+ baseDetails(index);if(el('priceModal').classList.contains('hidden'))return;
+ contactForm();el('modalBookButton').onclick=()=>choose(aircraft[index][0]);
+};
+function contactValid(){
+ const form=el('waCustomerForm');
+ if(!form){requestActionMessage('Open aircraft price details to complete your contact information.');return false}
+ if(!form.reportValidity())return false;
+ try{normalizeNumber(el('waPhone').value,true)}catch(error){el('waCustomerError').textContent=error.message;el('waPhone').focus();return false}
+ for(const [target,source] of [['waName','name'],['waEmail','email'],['waPhone','phone'],['waCompany','company'],['waNotes','notes']])el(source).value=el(target).value.trim();
+ if(!el('name').value){el('waCustomerError').textContent='Enter your full name.';return false}
+ return true;
+}
+function makeSnapshot(name,quote,hold){
+ const flights=currentTrip==='Multi City'?getMultiCityFlights():[{from:el('from').value,to:el('to').value,date:el('date').value,time:el('time').value}];
+ const routes=flights.map((f,i)=>({...f,route:(quote.quotes?.[i]||quote).route,hours:(quote.quotes?.[i]||quote).hours}));
+ if(currentTrip==='Round Trip')routes.push({from:el('to').value,to:el('from').value,date:el('returnDate').value,time:'',route:String(quote.route).split(' → ').reverse().join(' → '),hours:quote.hours});
+ const ref='TWA-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomUUID().slice(0,6).toUpperCase();
+ return {ref,name:el('name').value.trim(),email:el('email').value.trim(),phone:el('phone').value.trim(),company:el('company').value.trim(),from:flights[0].from,to:flights.at(-1).to,date:flights[0].date,time:flights[0].time,pax:el('pax').value,plane:name,purpose:el('purpose').value,trip:currentTrip,returnDate:currentTrip==='Round Trip'?el('returnDate').value:'',stops:currentTrip==='Multi City'?JSON.stringify({version:1,flights}):el('stops').value,notes:el('notes').value.trim(),status:'Awaiting Payment Instructions',
+  estimate:{totalUSD:quote.total,currency:el('currency').value,fx:num('fx'),hours:quote.totalHours||quote.hours,route:quote.route,breakdown:quote.items.map(([label,amount])=>[label,amount]),routes,holdExpires:Number(hold.expires),holdOwner:hold.owner,aircraftRegistration:aircraft.find(a=>a[0]===name)?.[2]}};
+}
+window.choose=async function(name){
+ if(busy)return false;
+ if(!validateBookingDates(true)){if(el('waCustomerError'))el('waCustomerError').textContent=bookingDatesError();return false}
+ if(!contactValid())return false;
+ if(name!==el('plane').value)return false;
+ const quote=window.priceForAircraft(name);if(!quote)return false;
+ if(!window.TWAFirebase?.createBooking){el('waCustomerError').textContent='Booking synchronization is unavailable. Please reconnect and try again.';return false}
+ const existing=window.TWACloudHolds?.[name],button=el('modalBookButton');
+ const prior=existing&&getData().find(b=>b.plane===name&&linkedHold(b)&&b.status!=='Cancelled');
+ if(prior&&existing.status==='pending'&&existing.owner===holdOwner&&existing.expires>Date.now()){
+  const candidate=makeSnapshot(name,quote,existing),keys=['name','email','phone','company','from','to','date','time','pax','plane','purpose','trip','returnDate','stops','notes'];
+  if(keys.every(key=>String(prior[key]||'')===String(candidate[key]||''))&&Number(prior.estimate?.totalUSD)===Number(quote.total)){
+   closePriceDetails();openPayment(prior.ref);showShare(prior);window.open(bookingWhatsAppURL(prior),'_blank','noopener,noreferrer');return true;
+  }
+  el('waCustomerError').textContent='This aircraft already has a booking request in progress. Release its current hold before submitting a different request.';return false;
+ }
+ const popup=popupDraft();
+ busy=true;button.disabled=true;el('waCustomerError').textContent='Starting aircraft hold and saving your request…';
+ el('contact').querySelectorAll('button').forEach(b=>b.disabled=true);
+ let acquired=null;
+ try{
+  if(!await baseChoose(name)){closePopup(popup);return false}
+  acquired=window.TWACloudHolds?.[name];
+  if(!acquired||acquired.owner!==holdOwner||acquired.status!=='pending'||Number(acquired.expires)<=Date.now())throw Error('The aircraft hold is unavailable. Please select the aircraft again.');
+  const item={...makeSnapshot(name,quote,acquired),createdBy:acquired.owner};
+  await window.TWAFirebase.createBooking(item);
+  try{const cached=JSON.parse(tenantStorage.getItem('twaBookings')||'[]');tenantStorage.setItem('twaBookings',JSON.stringify([item,...(Array.isArray(cached)?cached:[]).filter(b=>b.ref!==item.ref)]))}catch(error){console.warn('Booking cache:',error.message)}
+  if(window.TWAAdminVerified&&Array.isArray(window.TWACloudBookings)&&!window.TWACloudBookings.some(b=>b.ref===item.ref)){window.TWACloudBookings=[item,...window.TWACloudBookings];render()}
+  el('contact').classList.add('hidden');closePriceDetails();openPayment(item.ref);showShare(item);
+  el('paymentMessage').style.display='block';el('paymentMessage').textContent='Booking '+item.ref+' saved. Open WhatsApp and press Send to notify Admin.';
+  if(!navigatePopup(popup,bookingWhatsAppURL(item)))el('waShareStatus').textContent='Use Open WhatsApp to send your saved booking request.';
+  return true;
+ }catch(error){
+  closePopup(popup);
+  if(acquired&&(!existing||Number(existing.expires)!==Number(acquired.expires))){try{await window.TWAFirebase.releaseAircraft(name);el('plane').dataset.heldPlane=''}catch{}}
+  el('contact').classList.add('hidden');el('priceModal').classList.remove('hidden');
+  if(el('waCustomerError'))el('waCustomerError').textContent='Booking could not be saved: '+(error.code||error.message)+'. Please retry. Any unreleased hold expires automatically.';
+  return false;
+ }finally{busy=false;button.disabled=false;el('contact').querySelectorAll('button').forEach(b=>b.disabled=false)}
+};
+function ownHoldStatuses(items){
+ let changed=false;
+ const next=items.map(item=>{
+  const hold=linkedHold(item);if(!hold)return item;
+  const status=hold.status==='paid'?'Confirmed':hold.status==='released'&&item.status!=='Confirmed'?'Cancelled':item.status;
+  if(status!==item.status){changed=true;return {...item,status}}return item;
+ });
+ if(changed)try{tenantStorage.setItem('twaBookings',JSON.stringify(next))}catch{}
+ return next;
+}
+window.getData=function(){const items=baseGetData();return window.TWAAdminVerified?items:ownHoldStatuses(items)};
+window.renderPaymentSummary=function(){
+ basePayment();const item=getData().find(b=>b.ref===activePaymentRef);if(!item)return;
+ const state=document.createElement('p');state.className='small';state.textContent='Booking status: '+item.status;el('paymentSummary').append(state);
+ if(item.estimate?.breakdown)showShare(item);
+};
+const baseInstructions=window.requestPaymentInstructions;
+window.requestPaymentInstructions=function(){
+ const method=document.querySelector('input[name="payMethod"]:checked')?.value;if(!method)return baseInstructions();
+ const item=getData().find(b=>b.ref===activePaymentRef),hold=item&&linkedHold(item);
+ if(!hold||hold.status!=='pending'||hold.expires<=Date.now()){alert('This booking hold expired or changed. Please create a new booking request.');return false}
+ baseInstructions();const current=getData().find(b=>b.ref===activePaymentRef);showShare(current);
+ window.open(bookingWhatsAppURL(current),'_blank','noopener,noreferrer');return true;
+};
+window.openBookingReview=function(reference){
+ if(!/^[A-Za-z0-9-]{4,100}$/.test(String(reference||'')))return false;
+ reviewRef=reference;const url=new URL(location.href);url.searchParams.set('booking',reference);url.hash='admin';history.replaceState(null,'',url);
+ loginNote.textContent='Sign in as Admin to review booking '+reference+'.';showPage('admin');drawReview();return true;
+};
+function drawReview(){
+ review.hidden=!reviewRef||!window.TWAAdminVerified;if(review.hidden)return;
+ el('waReviewHeading').textContent='Booking Review · '+reviewRef;
+ const item=window.TWACloudBookings?.find(b=>b.ref===reviewRef);
+ if(!item){el('waReviewBody').textContent=Array.isArray(window.TWACloudBookings)?'This booking request was not found or has been deleted.':'Loading the booking request…';for(const id of ['waConfirmPayment','waUnderReview','waCancelRequest','waReplyCustomer'])el(id).disabled=true;el('waReviewHold').textContent='';return}
+ const body=bookingWhatsAppMessage(item,false)+'\n\nBooking status: '+item.status;if(el('waReviewBody').textContent!==body)el('waReviewBody').textContent=body;
+ const hold=linkedHold(item),pending=hold?.status==='pending'&&Number(hold.expires)>Date.now();
+ el('waReviewHold').textContent=hold?.status==='paid'?'Payment confirmed.':pending?'Linked aircraft hold: '+formatRemaining(hold.expires-Date.now())+' remaining.':'The linked hold has expired, was released, or belongs to a different request. Payment confirmation is unavailable.';
+ el('waConfirmPayment').disabled=actionBusy||!pending||item.status==='Cancelled';el('waUnderReview').disabled=actionBusy||['Confirmed','Cancelled'].includes(item.status);
+ el('waCancelRequest').disabled=actionBusy||item.status==='Cancelled';
+ el('waReplyCustomer').disabled=actionBusy;
+}
+window.applyBookingAdminAction=async function(action){
+ const item=window.TWACloudBookings?.find(b=>b.ref===reviewRef),status=el('waReviewStatus');if(actionBusy)return false;
+ try{
+  if(!window.TWAAdminVerified||!item)throw Error('Sign in as Admin and open an available booking request.');
+  if(!navigator.onLine)throw Error('Reconnect before updating a booking request.');
+  if(!['payment','review','cancel'].includes(action))throw Error('Invalid booking action.');
+  if(action==='payment'&&!confirm('Confirm payment for '+item.ref+' only after independently verifying that payment was received. Continue?'))return false;
+  if(action==='cancel'&&!confirm('Cancel booking '+item.ref+' and release its linked pending aircraft hold?'))return false;
+  actionBusy=true;drawReview();status.textContent='Updating booking…';
+  if(action==='payment')await window.TWAFirebase.confirmBookingPayment(item.ref);
+  else if(action==='cancel')await window.TWAFirebase.cancelBookingRequest(item.ref);
+  else await window.TWAFirebase.setBookingStatus(item.ref,'Under Review');
+  const next=action==='payment'?'Confirmed':action==='cancel'?'Cancelled':'Under Review';
+  if(Array.isArray(window.TWACloudBookings))window.TWACloudBookings=window.TWACloudBookings.map(b=>b.ref===item.ref?{...b,status:next}:b);
+  render();updateHoldUI();status.textContent='Booking '+item.ref+' updated: '+next+'.';return true;
+ }catch(error){status.textContent='Update failed: '+(error.code||error.message);return false}
+ finally{actionBusy=false;drawReview()}
+};
+el('waConfirmPayment').onclick=()=>applyBookingAdminAction('payment');el('waUnderReview').onclick=()=>applyBookingAdminAction('review');el('waCancelRequest').onclick=()=>applyBookingAdminAction('cancel');
+el('waReplyCustomer').onclick=()=>{
+ const item=window.TWACloudBookings?.find(b=>b.ref===reviewRef);if(!window.TWAAdminVerified||!item)return;
+ try{const number=normalizeNumber(item.phone,true),hold=linkedHold(item),text=[window.getCurrentCompanyConfig?.().appName||'TRANSWISATA PRIMA AVIATION','Booking: '+item.ref,'Dear '+item.name+',','Booking status: '+item.status,'Aircraft: '+item.plane,'Route: '+requestAirport(item.from)+' -> '+requestAirport(item.to),'Departure: '+requestDate(item.date)+' '+item.time+' WIB',hold?.status==='paid'&&item.status==='Confirmed'?'Payment receipt has been verified by Admin.':'Please contact our team for the latest quotation and payment instructions.'].join('\n');window.open('https://wa.me/'+number+'?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');el('waReviewStatus').textContent='Reply opened as a WhatsApp draft. Press Send to deliver it.'}catch(error){el('waReviewStatus').textContent=error.message}
+};
+el('waCloseReview').onclick=()=>{reviewRef='';review.hidden=true;loginNote.textContent='';const url=new URL(location.href);url.searchParams.delete('booking');history.replaceState(null,'',url)};
+window.render=function(){
+ baseRender();
+ el('records').querySelectorAll('[data-delete-request]').forEach(button=>{const reviewButton=document.createElement('button');reviewButton.type='button';reviewButton.className='btn secondary';reviewButton.style.cssText='padding:9px 13px;margin:0 6px 6px 0';reviewButton.textContent='Review';reviewButton.onclick=()=>openBookingReview(button.dataset.deleteRequest);button.before(reviewButton)});
+ drawReview();
+};
+window.syncAdminView=function(){baseSync();drawReview()};
+window.confirmHoldPayment=function(name){
+ if(!window.TWAAdminVerified)return;
+ const item=window.TWACloudBookings?.find(b=>b.plane===name&&linkedHold(b)&&b.status!=='Cancelled');
+ if(item)return openBookingReview(item.ref);
+ requestActionMessage('No linked booking is available for this hold. Wait for the customer request or release the hold.');
+};
+setInterval(()=>{if(reviewRef&&window.TWAAdminVerified)drawReview();if(activePaymentRef&&!window.TWAAdminVerified){const item=getData().find(b=>b.ref===activePaymentRef);if(item&&item.status!==el('paymentSummary').dataset.bookingStatus){renderPaymentSummary();el('paymentSummary').dataset.bookingStatus=item.status}}},1000);
+const initial=new URL(location.href).searchParams.get('booking');if(initial)openBookingReview(initial);
+})();
+</script><script type="module" id="twaFirebaseModule">
 import {initializeApp,deleteApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInAnonymously,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,setDoc,getDoc,collection,addDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
@@ -1300,6 +1533,7 @@ const configs=doc(db,'publicSettings','bookingApp');
 const reportError=e=>{console.error('Transwisata Firebase:',e);};
 function refreshLocalPublic(data){
  try{
+  if(data.communication)window.applyCommunicationSettings?.(data.communication);
   if(data.navigationDirectory)window.applyNavigationDirectory?.(data.navigationDirectory);
   if(data.customization)window.applyCompanyCustomization?.(data.customization);
   if(data.helicopterRoutes){tenantStorage.setItem('twaHelicopterRoutesV1',JSON.stringify(data.helicopterRoutes));window.drawHelicopterRoutesAdmin?.();window.calculateEstimate?.();}
@@ -1398,10 +1632,58 @@ window.TWAFirebase={
  },
  createBooking:async(item)=>{
   const dateError=departureDateError(item.date,item.time)||(item.trip==='Round Trip'?returnDateError(item.returnDate,item.date):'');if(dateError)throw Error(dateError);
-  if(!auth.currentUser)await signInAnonymously(auth);
-  const {estimate,...fields}=item;
-  const docData={...fields,estimate:estimate?{totalUSD:Number(estimate.totalUSD||0),currency:String(estimate.currency||'USD')}:null,createdAt:serverTimestamp(),createdBy:auth.currentUser.uid};
-  await setDoc(doc(db,'bookingRequests',item.ref),docData);
+  const user=await holdUser(),booking=doc(db,'bookingRequests',item.ref),{estimate,...fields}=item,known=aircraft.find(a=>a[0]===item.plane);
+  if(item.trip==='Multi City'){
+   let flights;try{flights=JSON.parse(item.stops).flights}catch{}if(!Array.isArray(flights)||!flights.length||flights.some(f=>departureDateError(f.date,f.time)))throw Error('The Multi City departure dates or times are invalid.');
+  }
+  const normalized=estimate?{
+   totalUSD:Number(estimate.totalUSD||0),currency:estimate.currency==='IDR'?'IDR':'USD',fx:Number(estimate.fx)||num('fx'),hours:Number(estimate.hours)||0,route:String(estimate.route||'').slice(0,3000),
+   breakdown:(Array.isArray(estimate.breakdown)?estimate.breakdown:[]).slice(0,30).map(entry=>{const [label,amount]=Array.isArray(entry)?entry:[entry.label,entry.amountUSD];return {label:String(label).slice(0,150),amountUSD:Number(amount)}}),
+   routes:(Array.isArray(estimate.routes)?estimate.routes:[]).slice(0,16).map(f=>({from:String(f.from||''),to:String(f.to||''),date:String(f.date||''),time:String(f.time||''),route:String(f.route||''),hours:Number(f.hours)||0}))
+  }:null;
+  if(normalized&&(!Number.isFinite(normalized.totalUSD)||normalized.totalUSD<0||normalized.breakdown.some(row=>!Number.isFinite(row.amountUSD)||row.amountUSD<0)))throw Error('The booking price breakdown is invalid.');
+  const docData={...fields,estimate:normalized,createdAt:serverTimestamp(),createdBy:user.uid};
+  if(!known){await setDoc(booking,docData);return}
+  const held=holdReference(item.plane);
+  await runTransaction(db,async tx=>{
+   const holdSnap=await tx.get(held),hold=holdSnap.exists()?holdSnap.data():null;
+   if(!hold||hold.owner!==user.uid||hold.status!=='pending'||hold.expires<=Date.now())throw Error('The aircraft hold expired or is unavailable.');
+   if(estimate?.holdExpires&&Number(estimate.holdExpires)!==Number(hold.expires))throw Error('The aircraft hold has changed. Please create a new request.');
+   docData.estimate={...(normalized||{}),holdExpires:Number(hold.expires),holdOwner:user.uid,aircraftRegistration:held.id};
+   tx.set(booking,docData);
+  });
+ },
+ confirmBookingPayment:async(reference)=>{
+  if(!window.TWAAdminVerified)throw Error('Admin sign-in is required.');
+  const booking=doc(db,'bookingRequests',reference);
+  const result=await runTransaction(db,async tx=>{
+   const bookingSnap=await tx.get(booking);if(!bookingSnap.exists())throw Error('Booking request not found.');
+   const item=bookingSnap.data(),reg=item.estimate?.aircraftRegistration;
+   if(typeof reg!=='string'||!/^[A-Z0-9][A-Z0-9-]{1,19}$/.test(reg))throw Error('This request is not linked to an active aircraft hold.');
+   const held=doc(db,'fleetHolds',reg),holdSnap=await tx.get(held),hold=holdSnap.exists()?holdSnap.data():null;
+   if(!hold||hold.owner!==item.createdBy||Number(hold.expires)!==item.estimate?.holdExpires||hold.plane!==item.plane)throw Error('The aircraft hold has changed or belongs to another request.');
+   if(item.status==='Cancelled')throw Error('This booking request has been cancelled.');
+   if(hold.status==='paid'&&item.status==='Confirmed')return {plane:hold.plane,value:{...hold,registration:reg}};
+   if(hold.status!=='pending'||hold.expires<=Date.now())throw Error('This hold expired or is already confirmed for another request.');
+   tx.update(held,{status:'paid',updatedAt:serverTimestamp()});tx.update(booking,{status:'Confirmed'});
+   return {plane:hold.plane,value:{...hold,status:'paid',registration:reg}};
+  });
+  window.TWACloudHolds={...window.TWACloudHolds,[result.plane]:result.value};window.updateHoldUI?.();window.updatePaymentTimer?.();
+ },
+ cancelBookingRequest:async(reference)=>{
+  if(!window.TWAAdminVerified)throw Error('Admin sign-in is required.');
+  const booking=doc(db,'bookingRequests',reference);
+  const result=await runTransaction(db,async tx=>{
+   const bookingSnap=await tx.get(booking);if(!bookingSnap.exists())throw Error('Booking request not found.');
+   const item=bookingSnap.data(),reg=item.estimate?.aircraftRegistration,held=typeof reg==='string'&&/^[A-Z0-9][A-Z0-9-]{1,19}$/.test(reg)?doc(db,'fleetHolds',reg):null;
+   const holdSnap=held?await tx.get(held):null,hold=holdSnap?.exists()?holdSnap.data():null;
+   tx.update(booking,{status:'Cancelled'});
+   if(hold&&hold.owner===item.createdBy&&Number(hold.expires)===item.estimate?.holdExpires&&hold.plane===item.plane&&hold.status==='pending'){
+    tx.update(held,{status:'released',updatedAt:serverTimestamp()});return {plane:hold.plane,value:{...hold,status:'released',registration:reg}};
+   }
+   return null;
+  });
+  if(result)window.TWACloudHolds={...window.TWACloudHolds,[result.plane]:result.value};window.updateHoldUI?.();window.updatePaymentTimer?.();
  },
  deleteBooking:async(id)=>{if(!window.TWAAdminVerified)throw Error('Admin sign-in required');if(typeof id!=='string'||!id||id.includes('/'))throw Error('Invalid booking reference');await deleteDoc(doc(db,'bookingRequests',id));},
  setBookingStatus:async(id,status)=>{if(!window.TWAAdminVerified)throw Error('Admin sign-in required');await updateDoc(doc(db,'bookingRequests',id),{status})}
