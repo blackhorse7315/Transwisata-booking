@@ -303,11 +303,11 @@ try:
                 if(departureDateError('2026-10-23','12:00',fixed+1000)==='')throw Error('Seconds below two-hour lead accepted');
                 trip('One Way',tab('One Way'));set('from','HLP');set('to','SUB');set('plane','King Air 350i');set('date','2026-11-07');set('time','12:00');refreshBookingDateLimits();updateRoute();
                 if(document.getElementById('date').max!=='2026-11-06'||validateBookingDates(true)||priceForAircraft('King Air 350i')!==null)throw Error('One Way date cap missing');
-                if(!document.getElementById('bookingDateError').textContent.includes('14 hari'))throw Error('Visible date-limit explanation missing');
+                if(!document.getElementById('bookingDateError').textContent.includes('14 days'))throw Error('Visible date-limit explanation missing');
                 if(await choose('King Air 350i')!==false||await holdAircraft('King Air 350i')!==false||submitBooking()!==false||reserves)throw Error('Invalid date reached hold/submission');
                 document.getElementById('contact').classList.add('hidden');next();if(!document.getElementById('contact').classList.contains('hidden'))throw Error('Invalid date reached contact form');
                 set('date','2026-10-23');set('time','11:59');refreshBookingDateLimits();
-                if(validateBookingDates(true)||!document.getElementById('bookingDateError').textContent.includes('2 jam'))throw Error('Same-day lead explanation missing');
+                if(validateBookingDates(true)||!document.getElementById('bookingDateError').textContent.includes('2 hours'))throw Error('Same-day lead explanation missing');
                 set('time','12:00');refreshBookingDateLimits();if(!validateBookingDates()||document.getElementById('time').min!=='12:00')throw Error('Two-hour ETD or time picker incorrect');
                 trip('Round Trip',tab('Round Trip'));set('returnDate','2026-11-07');if(validateBookingDates(true))throw Error('Return exceeds 14 days');
                 set('returnDate','2026-11-06');if(!validateBookingDates())throw Error('Valid Round Trip rejected');
