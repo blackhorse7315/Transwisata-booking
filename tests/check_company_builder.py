@@ -31,13 +31,17 @@ try:
             window.priceForAircraft=(name,...args)=>{calls.push(name);return original(name,...args)};
             try{
                 updateRoute();
-                if(calls.length||lastEstimate!==null||document.querySelectorAll('#fleet .fleet-price').length)throw Error('Unselected aircraft automatically priced');
+                if(calls.length||lastEstimate!==null||document.querySelectorAll('#fleet .fleet-price-block,.fleet-detail').length)throw Error('Unselected aircraft automatically priced or has detail UI');
                 set('plane','Gulfstream IV-SP');updatePlaneCosts();
                 if(!calls.length||calls.some(name=>name!=='Gulfstream IV-SP'))throw Error('Other aircraft priced with Gulfstream selected');
                 if(document.querySelectorAll('#fleet .fleet-price').length!==1||!lastEstimate)throw Error('Selected-only estimate missing');
                 calls.length=0;
-                showPriceDetails(1);
-                if(document.getElementById('plane').value!=='King Air 350i'||calls.some(name=>name!=='King Air 350i'))throw Error('Aircraft card did not select the requested estimate');
+                document.querySelectorAll('#fleet .aircraft')[1].click();showPriceDetails(1);
+                if(document.getElementById('plane').value!=='Gulfstream IV-SP'||calls.length||!document.getElementById('priceModal').classList.contains('hidden'))throw Error('Unselected card opened a price or changed Preferred Aircraft');
+                const unselected=Array.from(document.querySelectorAll('#fleet .aircraft')).filter((card,i)=>aircraft[i][0]!==document.getElementById('plane').value);
+                if(unselected.some(card=>card.querySelector('.fleet-price-block,.fleet-detail,.runway-assessment')||card.onclick))throw Error('Unselected aircraft still has price/detail controls');
+                set('plane','King Air 350i');updatePlaneCosts();showPriceDetails(1);
+                if(calls.some(name=>name!=='King Air 350i'))throw Error('Other aircraft calculated after Preferred Aircraft changed');
                 if(document.querySelectorAll('#fleet .fleet-price').length!==1)throw Error('Previous aircraft price remained visible');
                 if(Math.abs(lastEstimate.totalUSD-original('King Air 350i').total)>1e-6)throw Error('Estimate not switched to selected aircraft');
                 closePriceDetails();calls.length=0;
@@ -46,10 +50,28 @@ try:
                 calls.length=0;set('plane','');updatePlaneCosts();
                 if(calls.length||lastEstimate!==null||document.querySelectorAll('#fleet .fleet-price').length||document.getElementById('costRows').children.length)throw Error('Cleared selection retained prices');
                 set('currency','IDR');
-                return {noDefaultEstimate:true,selectedOnly:true,cardSelection:true,switching:true,clearSelection:true};
+                return {noDefaultEstimate:true,selectedOnly:true,preferredDropdownOnly:true,switching:true,clearSelection:true};
             }finally{window.priceForAircraft=original;closePriceDetails()}
         }""")
         print("SELECTED_AIRCRAFT_PRICING_CHECKS",json.dumps(result))
+
+        for width in [1280,390]:
+            page.set_viewport_size({"width":width,"height":900})
+            result=page.evaluate("""()=>{
+                updateHoldUI();renderFleetPrices();updateHoldUI();
+                const cards=Array.from(document.querySelectorAll('#fleet .aircraft'));
+                for(const card of cards){
+                    const badges=card.querySelectorAll('.fleet-state'),badge=badges[0],photo=card.querySelector('.art');
+                    if(badges.length!==1||badge.parentElement!==card)throw Error('Availability badge is not attached to card photo layer');
+                    const b=badge.getBoundingClientRect(),p=photo.getBoundingClientRect(),a=card.getBoundingClientRect();
+                    if(getComputedStyle(badge).position!=='absolute'||b.top<a.top||b.top>a.top+45||b.bottom>p.bottom)throw Error('Availability badge moved below photo');
+                }
+                return {cards:cards.length,badgesOnPhotos:true,noPriceBlocks:document.querySelectorAll('#fleet .fleet-price-block').length===0};
+            }""")
+            assert result["badgesOnPhotos"] and result["noPriceBlocks"], result
+            print("FLEET_BADGE_LAYOUT_CHECK",width,json.dumps(result))
+        page.set_viewport_size({"width":1280,"height":900})
+
 
         # Multi City uses each sector's airports and dates, then totals all movement costs.
         page.evaluate("""()=>{
